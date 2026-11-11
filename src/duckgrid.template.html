@@ -1,0 +1,2307 @@
+<title>DuckGrid</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: full-height tool. Top bar, filter bar, then grid (left, flexible) + pivot side panel (right). Stacks on phones. */
+:root {
+  --bg: #f3f4f6;
+  --surface: #ffffff;
+  --head: #f6f7f9;
+  --line: #d9dde3;
+  --line-soft: #eceef2;
+  --fg: #1a1d22;
+  --muted: #646d78;
+  --accent: #a96500;
+  --accent-strong: #8a5200;
+  --accent-soft: rgba(212, 140, 20, 0.12);
+  --bar: rgba(212, 140, 20, 0.22);
+  --row-sel: rgba(212, 140, 20, 0.08);
+  --skel: #eef0f3;
+  --danger: #b42318;
+  --ok: #1a7f4b;
+  --on-accent: #ffffff;
+  --series-1: #2a78d6;
+  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4; --c6: #008300; --c7: #6250d6; --c8: #e34948; --c-other: #a7adb6;
+  --good: #006300;
+  --bad: #c62f2f;
+  --heat-dark: 0;
+  --tip-shadow: 0 6px 24px rgba(20, 24, 32, 0.14);
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101216; --surface: #171a1f; --head: #1c2026; --line: #2b3038; --line-soft: #22262d;
+    --fg: #e6e8eb; --muted: #8e97a3; --accent: #f0b03c; --accent-strong: #ffc65c;
+    --accent-soft: rgba(240, 176, 60, 0.14); --bar: rgba(240, 176, 60, 0.24); --row-sel: rgba(240, 176, 60, 0.09);
+    --skel: #20242b; --danger: #ff8a7a; --ok: #5fd39a; --on-accent: #1a1205;
+    --series-1: #3987e5; --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767; --c-other: #5b626d; --good: #2fbf4f; --bad: #ff7b72; --heat-dark: 1; --tip-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101216; --surface: #171a1f; --head: #1c2026; --line: #2b3038; --line-soft: #22262d;
+  --fg: #e6e8eb; --muted: #8e97a3; --accent: #f0b03c; --accent-strong: #ffc65c;
+  --accent-soft: rgba(240, 176, 60, 0.14); --bar: rgba(240, 176, 60, 0.24); --row-sel: rgba(240, 176, 60, 0.09);
+  --skel: #20242b; --danger: #ff8a7a; --ok: #5fd39a; --on-accent: #1a1205;
+    --series-1: #3987e5; --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #008300; --c7: #9085e9; --c8: #e66767; --c-other: #5b626d; --good: #2fbf4f; --bad: #ff7b72; --heat-dark: 1; --tip-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; }
+* { box-sizing: border-box; }
+button, input, select { font: inherit; color: inherit; }
+
+.app {
+  height: 100%;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* Top bar */
+.topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.logo { display: grid; grid-template-columns: repeat(3, 6px); gap: 2px; }
+.logo i { width: 6px; height: 6px; background: var(--line); border-radius: 1px; }
+.logo i.on { background: var(--accent); }
+.brand h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+.brand .engine { font-family: var(--font-data); font-size: 11.5px; color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ctl-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+select, .input {
+  height: 32px; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 0 10px;
+}
+select:focus-visible, .input:focus-visible, .btn:focus-visible, .chip:focus-visible, .tab:focus-visible, .grid-scroll:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+.btn {
+  height: 32px; padding: 0 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface);
+  font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.file-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* Filter bar */
+.filterbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+.kw { font-family: var(--font-data); font-weight: 500; font-size: 12.5px; color: var(--accent); }
+.filterbar .input { flex: 1 1 280px; min-width: 0; font-family: var(--font-data); font-size: 12.5px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.chip {
+  font-family: var(--font-data); font-size: 11.5px; padding: 3px 8px; border-radius: 4px;
+  border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer;
+}
+.chip:hover { color: var(--fg); border-color: var(--muted); }
+.err { flex-basis: 100%; color: var(--danger); font-family: var(--font-data); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+
+/* Work area */
+.work { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 10px; }
+.pane { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.gridhost { position: relative; flex: 1; min-height: 0; }
+.statusbar {
+  display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center;
+  border-top: 1px solid var(--line); padding: 6px 12px; font-size: 12px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.statusbar b { color: var(--fg); font-weight: 600; }
+.statusbar .sel { font-family: var(--font-data); font-size: 11.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.statusbar .grow { margin-left: auto; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--fg); font-size: 11.5px; }
+.pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.pill.idle .dot { background: var(--ok); }
+.pill.busy .dot { animation: pulse 1s infinite ease-in-out; }
+@keyframes pulse { 50% { opacity: 0.25; } }
+
+/* Grid */
+.grid canvas { position: absolute; left: 0; top: 0; display: block; }
+.grid-scroll { position: absolute; inset: 0; overflow: auto; cursor: cell; overscroll-behavior: contain; }
+.grid-spacer { width: 1px; height: 1px; }
+
+/* Boot overlay */
+.boot {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 24px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent); z-index: 2;
+}
+.boot-card { width: min(420px, 100%); display: grid; gap: 10px; }
+.boot-title { font-weight: 600; font-size: 15px; }
+.boot-step { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 3px; background: var(--line-soft); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+.bar.indet > i { width: 30%; animation: slide 1.2s infinite ease-in-out; }
+@keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
+.boot.error .boot-title { color: var(--danger); }
+
+/* Side panel */
+.tabs { display: flex; border-bottom: 1px solid var(--line); }
+.tab {
+  flex: 1; padding: 10px 12px; background: none; border: 0; border-bottom: 2px solid transparent;
+  font-weight: 600; font-size: 13px; color: var(--muted); cursor: pointer;
+}
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tabpanel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.pv-form { display: grid; grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; padding: 12px; border-bottom: 1px solid var(--line); }
+.pv-form label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.pv-form select { width: 100%; min-width: 0; height: 30px; font-size: 13px; padding: 0 6px; }
+.pv-meta { padding: 8px 12px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+.pv-meta b { color: var(--fg); font-weight: 600; }
+.pv-meta .err { display: block; margin-top: 4px; }
+#pvGrid { flex: 1; min-height: 200px; }
+
+.log-head { padding: 12px; font-size: 12.5px; color: var(--muted); line-height: 1.5; border-bottom: 1px solid var(--line); }
+.log-head code { font-family: var(--font-data); font-size: 11.5px; color: var(--fg); background: var(--head); padding: 1px 5px; border-radius: 3px; }
+.log { flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 0; list-style: none; }
+.log li { padding: 10px 12px; border-bottom: 1px solid var(--line-soft); display: grid; gap: 6px; }
+.log .row1 { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; font-weight: 600; }
+.log .ms { font-family: var(--font-data); font-weight: 500; font-size: 11.5px; color: var(--accent); white-space: nowrap; }
+.log pre { margin: 0; font-family: var(--font-data); font-size: 11px; color: var(--muted); white-space: pre-wrap; word-break: break-word; max-height: 8.5em; overflow: auto; }
+.log .empty { color: var(--muted); font-size: 12.5px; }
+
+
+/* Pane header + view switch */
+.pane-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.seg { display: inline-flex; background: var(--head); border: 1px solid var(--line); border-radius: 7px; padding: 2px; }
+.seg button { border: 0; background: none; padding: 5px 16px; border-radius: 5px; font-weight: 600; font-size: 13px; color: var(--muted); cursor: pointer; }
+.seg button[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pane-hint { font-size: 12px; color: var(--muted); min-width: 0; }
+
+/* Insights view */
+.insights { flex: 1; min-height: 0; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; background: var(--bg); }
+.ins-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.ins-controls label { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.ins-controls select { height: 30px; font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--fg); max-width: 220px; }
+.ins-period { font-size: 12px; color: var(--muted); flex-basis: 100%; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; }
+.kpi-label { font-size: 12px; color: var(--muted); }
+.kpi-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.kpi-value { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+.spark { flex: none; overflow: visible; }
+.sp-line { fill: none; stroke: var(--series-1); stroke-width: 1.5; stroke-linejoin: round; }
+.sp-dot { fill: var(--series-1); }
+.delta { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.delta.up { color: var(--good); }
+.delta.down { color: var(--bad); }
+.delta-sfx { font-size: 12px; font-weight: 400; color: var(--muted); }
+.ins-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; align-items: start; }
+.ins-grid .span-all { grid-column: 1 / -1; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 6px 14px; }
+.card h3 { margin: 0; font-size: 14px; font-weight: 600; text-wrap: balance; }
+.card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
+.lg { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--series-1); flex: none; }
+.sw.dash { border-top: 1.5px dashed var(--muted); }
+.sw.bar { height: 8px; border: 0; border-radius: 2px; background: var(--series-1); width: 10px; }
+.chart { width: 100%; min-width: 0; }
+.trend-svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.ax text { fill: var(--muted); font: 11px var(--font-data); }
+.ax .gl { stroke: var(--line-soft); stroke-width: 1; }
+.ax .base { stroke: var(--line); stroke-width: 1; }
+.ln { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pl { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.ar { fill: var(--series-1); opacity: 0.08; }
+.dot { fill: var(--series-1); stroke: var(--surface); stroke-width: 2; }
+.dot2 { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
+.xh { stroke: var(--muted); stroke-width: 1; opacity: 0.6; }
+.ann line { stroke: var(--fg); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.6; }
+.ann .ann-ring { fill: none; stroke: var(--fg); stroke-width: 1.5; }
+.ann text { fill: var(--fg); font: 600 11.5px var(--font-ui); }
+.ins-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.ins { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line-soft); }
+.ins:first-child { border-top: 0; padding-top: 2px; }
+.ins-kind { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; color: var(--muted); }
+.ins-text { margin: 0; font-size: 13.5px; line-height: 1.5; max-width: 62ch; }
+.ins-text strong { font-weight: 600; }
+.chg.up { color: var(--good); }
+.chg.down { color: var(--bad); }
+.ins-act { justify-self: start; background: none; border: 0; padding: 0; font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.ins-act:hover { text-decoration: underline; }
+.ins-act:focus-visible, .bar-row:focus-visible, .heat-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ins-empty { color: var(--muted); font-size: 13px; }
+.bars { display: grid; gap: 2px; }
+.bar-row { display: grid; grid-template-columns: minmax(70px, 120px) minmax(40px, 1fr) auto 68px; align-items: center; gap: 10px; padding: 5px 4px; border: 0; background: none; border-radius: 4px; cursor: pointer; text-align: left; font-size: 13px; }
+.bar-row:hover:not(:disabled) { background: var(--row-sel); }
+.bar-row:disabled { cursor: default; }
+.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { height: 12px; display: block; }
+.bar-track i { display: block; height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; }
+.bar-val { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; white-space: nowrap; }
+.bar-val small { font-weight: 400; color: var(--muted); font-size: 11.5px; }
+.bar-row .delta { text-align: right; }
+.heat-wrap { overflow-x: auto; }
+.heat-grid { display: grid; gap: 2px; min-width: max-content; font-size: 12px; }
+.heat-corner { }
+.heat-col { font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 0 4px 4px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+.heat-row { font-size: 12.5px; padding: 0 10px 0 0; display: flex; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.heat-cell { height: 34px; border: 0; border-radius: 3px; font: 500 11.5px var(--font-data); cursor: pointer; padding: 0 6px; background: var(--line-soft); color: var(--muted); }
+.heat-cell:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--fg) inset; }
+.heat-legend { display: flex; align-items: center; gap: 8px; font: 11px var(--font-data); color: var(--muted); }
+.heat-ramp { width: 160px; max-width: 40vw; height: 8px; border-radius: 2px; }
+.tip { position: fixed; z-index: 50; pointer-events: none; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--tip-shadow); border-radius: 6px; padding: 8px 10px; font-size: 12px; min-width: 170px; max-width: 280px; display: grid; gap: 4px; }
+.tip-title { font-weight: 600; margin-bottom: 2px; }
+.tip-row { display: flex; justify-content: space-between; gap: 14px; }
+.tip-l { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.tip-v { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Charts view */
+.charts { flex: 1; min-height: 0; overflow: auto; padding: 14px; background: var(--bg); display: flex; flex-direction: column; gap: 14px; }
+.ch-intro h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.ch-intro p { margin: 4px 0 0; font-size: 13px; color: var(--muted); max-width: 70ch; }
+.ch-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.ch-card { display: flex; flex-direction: column; gap: 6px; align-items: stretch; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; cursor: pointer; min-width: 0; }
+.ch-card:hover:not(:disabled) { border-color: var(--accent); }
+.ch-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ch-card:disabled { cursor: default; opacity: 0.55; }
+.ch-preview { height: 132px; display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: none; }
+.ch-preview svg { max-width: 100%; height: auto; }
+.ch-name { font-weight: 600; font-size: 14px; }
+.ch-best { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.ch-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.ch-back { height: 30px; padding: 0 12px; font-size: 13px; }
+.ch-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.ch-head p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.ch-fields { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.ch-field { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+.ch-field select { height: 30px; font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--fg); max-width: 220px; }
+.ch-canvas { min-height: 320px; }
+.ch-note { font-size: 12px; color: var(--muted); }
+.ch-spec summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.ch-spec pre { margin: 8px 0 0; padding: 10px 12px; background: var(--head); border: 1px solid var(--line-soft); border-radius: 6px; font: 11.5px/1.5 var(--font-data); white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow: auto; }
+.sw.dotc { width: 10px; height: 10px; border: 0; border-radius: 2px; }
+.ramp-lg { gap: 8px; font-family: var(--font-data); font-size: 11px; }
+.d3c { display: block; max-width: 100%; height: auto; overflow: visible; }
+.d3c .ax text, .d3c .ax-t { fill: var(--muted); font: 11px var(--font-data); }
+.d3c .ax.lbl text { font: 12.5px var(--font-ui); fill: var(--fg); }
+.d3c .ax .gl { stroke: var(--line-soft); }
+.d3c .base, .d3c .ax .base { stroke: var(--line); }
+.d3c .vlab text, .d3c .vlab { fill: var(--fg); font: 600 11.5px var(--font-data); }
+.d3c .dlab text { fill: var(--fg); font: 600 12px var(--font-ui); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.d3c .ax-title { fill: var(--muted); font: 600 11.5px var(--font-ui); }
+.d3c .mark { cursor: pointer; }
+.d3c .mark:hover { filter: brightness(1.08) saturate(1.05); }
+.d3c .seg, .d3c .tile, .d3c .slice, .d3c .ring1, .d3c .ring2 { stroke: var(--surface); stroke-width: 1; }
+.d3c .ring2 { opacity: 0.72; }
+.d3c .bubble { stroke: var(--surface); stroke-width: 2; opacity: 0.86; }
+.d3c .layer { stroke: var(--surface); stroke-width: 0.6; }
+.d3c .area1 { opacity: 0.1; }
+.d3c .ln2 { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.d3c .dotc { stroke: var(--surface); stroke-width: 2; }
+.d3c .cv { font: 500 11px var(--font-data); pointer-events: none; }
+.d3c .ftitle { fill: var(--fg); font: 600 12.5px var(--font-ui); }
+.d3c .fval { fill: var(--muted); font: 11px var(--font-data); }
+.d3c .tm-group { fill: var(--fg); font: 600 12px var(--font-ui); }
+.d3c .tm-label { fill: #ffffff; font: 600 12px var(--font-ui); pointer-events: none; }
+.d3c .tm-val { fill: #ffffff; font: 400 11px var(--font-data); opacity: 0.9; }
+.d3c .arc-lab { fill: #ffffff; font: 600 11.5px var(--font-ui); pointer-events: none; }
+.d3c .center-v { fill: var(--fg); font: 600 22px var(--font-ui); }
+.d3c .center-l { fill: var(--muted); font: 12px var(--font-ui); }
+.d3c .dl-name { fill: var(--fg); font: 13px var(--font-ui); }
+.d3c .dl-val { fill: var(--muted); font: 600 12px var(--font-data); }
+.d3c .day { cursor: pointer; }
+
+@media (max-width: 900px) {
+  html, body { height: auto; }
+  .app { height: auto; min-height: 100%; }
+  .work { grid-template-columns: minmax(0, 1fr); }
+  .gridpane { height: 78vh; min-height: 420px; }
+  .sidepane { height: 70vh; min-height: 420px; }
+  .brand { margin-right: 0; flex-basis: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pill.busy .dot, .bar.indet > i { animation: none; }
+  .bar > i { transition: none; }
+}
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><i class="on"></i><i></i><i></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i></div>
+      <h1>DuckGrid</h1>
+      <span class="engine" id="engineTag">DuckDB · WebAssembly · canvas grid</span>
+    </div>
+    <div class="controls">
+      <span class="ctl-label">Sample data</span>
+      <select id="rowsSel" aria-label="Number of rows to generate">
+        <option value="1000000">1,000,000 rows</option>
+        <option value="5000000">5,000,000 rows</option>
+        <option value="10000000" selected>10,000,000 rows</option>
+      </select>
+      <button class="btn" id="genBtn" disabled>Generate</button>
+      <label class="btn" for="csvInput" id="csvLabel">Load CSV…</label>
+      <input class="file-input" type="file" id="csvInput" accept=".csv,.tsv,.txt,text/csv">
+    </div>
+  </header>
+
+  <div class="filterbar">
+    <span class="kw">WHERE</span>
+    <input class="input" id="whereInput" type="text" spellcheck="false" autocomplete="off" placeholder="region = 'Europe' AND revenue > 1000" aria-label="SQL filter condition">
+    <button class="btn primary" id="applyBtn" disabled>Apply</button>
+    <button class="btn" id="clearBtn" disabled>Clear</button>
+    <div class="chips" id="chips">
+      <button class="chip">region = 'Europe'</button>
+      <button class="chip">revenue &gt; 4000</button>
+      <button class="chip">order_date &gt;= DATE '2025-06-01' AND channel = 'Online'</button>
+      <button class="chip">category IN ('Outdoor', 'Apparel') AND discount = 0</button>
+    </div>
+    <div class="err" id="whereErr" hidden></div>
+  </div>
+
+  <main class="work">
+    <section class="pane gridpane">
+        <div class="boot" id="boot">
+          <div class="boot-card">
+            <div class="boot-title" id="bootTitle">Starting DuckGrid</div>
+            <div class="bar" id="bootBar"><i></i></div>
+            <div class="boot-step" id="bootStep">Preparing…</div>
+          </div>
+        </div>
+      <div class="pane-head">
+        <div class="seg" role="tablist" aria-label="View">
+          <button role="tab" data-view="insights" aria-selected="true">Insights</button>
+          <button role="tab" data-view="charts" aria-selected="false">Charts</button>
+          <button role="tab" data-view="table" aria-selected="false">Table</button>
+        </div>
+        <span class="pane-hint">Same data, same filter. Click any mark or insight to filter.</span>
+      </div>
+      <div class="insights" id="insights">
+        <div class="ins-controls">
+          <label>Measure <select id="insMeasure"></select></label>
+          <label>Break down by <select id="insDim"></select></label>
+          <label>Heatmap columns <select id="insHeat"></select></label>
+          <span class="ins-period" id="insPeriod">Computing…</span>
+        </div>
+        <div class="kpis" id="kpis"></div>
+        <div class="ins-grid">
+          <section class="card span-all" id="trendCard">
+            <div class="card-head">
+              <div><h3 id="trendTitle">By month</h3><div class="card-sub" id="trendSub"></div></div>
+              <div class="legend" id="trendLegend"></div>
+            </div>
+            <div class="chart" id="trend"></div>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h3>What changed</h3><div class="card-sub">Found automatically by comparing periods, groups and seasonality.</div></div></div>
+            <ol class="ins-list" id="insightList"><li class="ins-empty">Computing…</li></ol>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h3 id="barsTitle">Breakdown</h3><div class="card-sub" id="barsSub"></div></div></div>
+            <div class="bars" id="bars"></div>
+          </section>
+          <section class="card span-all" id="heatCard">
+            <div class="card-head"><div><h3 id="heatTitle">Heatmap</h3><div class="card-sub" id="heatSub"></div></div></div>
+            <div id="heat"></div>
+          </section>
+        </div>
+      </div>
+      <div class="charts" id="charts" hidden>
+        <div id="gallery">
+          <div class="ch-intro"><h2>Pick a chart</h2><p>Each preview is drawn with D3 from sample data. Choose one and it is rebuilt from your table with DuckDB, using the current filter. Charts you can't use with this data are dimmed.</p></div>
+          <div class="ch-cards" id="chartCards" style="margin-top:12px"></div>
+        </div>
+        <div id="builder" hidden>
+          <div class="card" style="gap:12px">
+            <div class="ch-bar">
+              <button class="btn ch-back" id="chBack">← All charts</button>
+              <div class="ch-head"><h2 id="chTitle">Chart</h2><p id="chBest"></p></div>
+            </div>
+            <div class="ch-fields" id="chFields"></div>
+            <div class="legend" id="chLegend"></div>
+            <div class="ch-canvas" id="chArea"></div>
+            <div class="ch-note" id="chNote"></div>
+            <details class="ch-spec"><summary>Chart spec and SQL (what an agent sends)</summary><pre id="chSpec"></pre></details>
+          </div>
+        </div>
+      </div>
+      <div class="gridhost" id="mainGrid" hidden>
+      </div>
+      <footer class="statusbar">
+        <span id="stRows"><b>—</b> rows</span>
+        <span class="sel" id="stSel">Click a cell to select it. Click a header to sort; Shift-click adds a second sort.</span>
+        <span class="grow" id="stFetch"></span>
+        <span class="pill busy" id="stOp"><span class="dot"></span><span id="stOpText">Loading engine</span></span>
+      </footer>
+    </section>
+
+    <aside class="pane sidepane">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tabPivot" aria-selected="true" aria-controls="panelPivot">Pivot</button>
+        <button class="tab" role="tab" id="tabLog" aria-selected="false" aria-controls="panelLog">SQL log</button>
+      </div>
+      <div class="tabpanel" id="panelPivot" role="tabpanel">
+        <div class="pv-form">
+          <label for="pvRow1">Rows</label>
+          <select id="pvRow1"></select>
+          <select id="pvRow2" aria-label="Second row field"></select>
+          <label for="pvCol">Columns</label>
+          <select id="pvCol" style="grid-column: span 2"></select>
+          <label for="pvAgg">Values</label>
+          <select id="pvAgg">
+            <option value="sum">Sum</option>
+            <option value="avg">Average</option>
+            <option value="count">Count</option>
+            <option value="min">Min</option>
+            <option value="max">Max</option>
+          </select>
+          <select id="pvMeasure" aria-label="Value field"></select>
+        </div>
+        <div class="pv-meta" id="pvMeta">Pivot runs on the full dataset, with the current filter applied.</div>
+        <div class="gridhost" id="pvGrid"></div>
+      </div>
+      <div class="tabpanel" id="panelLog" role="tabpanel" hidden>
+        <div class="log-head">Every action in the grid and the insights view is a SQL statement run by DuckDB. The same operations are available to scripts and AI agents as <code>window.duckgrid</code>: <code>filter()</code>, <code>sort()</code>, <code>pivot()</code>, <code>insights()</code>, <code>chartTypes()</code>, <code>chart()</code>, <code>sql()</code>.</div>
+        <ul class="log" id="log"><li class="empty">Statements appear here as you work.</li></ul>
+      </div>
+    </aside>
+  </main>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>__DUCKDB_BUNDLE__</script>
+<script>
+(() => {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const qi = (n) => '"' + String(n).replace(/"/g, '""') + '"';
+const qs = (s) => "'" + String(s).replace(/'/g, "''") + "'";
+const nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const nf2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtMs = (ms) => ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`;
+const ENGINE_GZ_BYTES = 7034942;
+
+// ---------- theme tokens for canvas ----------
+let T = null;
+function theme() {
+  if (T) return T;
+  const cs = getComputedStyle(document.documentElement);
+  const g = (n) => cs.getPropertyValue(n).trim();
+  T = { surface: g('--surface'), head: g('--head'), line: g('--line'), lineSoft: g('--line-soft'), fg: g('--fg'),
+        muted: g('--muted'), accent: g('--accent'), accentSoft: g('--accent-soft'), bar: g('--bar'),
+        rowSel: g('--row-sel'), skel: g('--skel') };
+  return T;
+}
+const grids = [];
+function themeChanged() { T = null; grids.forEach((g) => g.invalidate()); try { if (insData && currentView === 'insights') renderInsights(); if (currentView === 'charts') { if (CH.builder.hidden) renderGallery(); else drawChart(); } } catch (e) {} }
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeChanged); } catch (e) {}
+new MutationObserver(themeChanged).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+const F_TEXT = '12.5px "IBM Plex Sans", system-ui, sans-serif';
+const F_NUM = '12px "IBM Plex Mono", ui-monospace, Menlo, monospace';
+const F_HEAD = '600 12px "IBM Plex Sans", system-ui, sans-serif';
+const F_TAG = '10px "IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+function classify(type) {
+  const t = String(type).toUpperCase();
+  if (/^(TINYINT|SMALLINT|INTEGER|BIGINT|HUGEINT|UTINYINT|USMALLINT|UINTEGER|UBIGINT|UHUGEINT|INT)/.test(t)) return 'int';
+  if (/^(FLOAT|DOUBLE|REAL|DECIMAL|NUMERIC)/.test(t)) return 'num';
+  if (/^(DATE|TIMESTAMP|TIME)/.test(t)) return 'date';
+  if (t === 'BOOLEAN') return 'bool';
+  return 'text';
+}
+const isNumKind = (k) => k === 'int' || k === 'num';
+
+// ---------- database layer ----------
+let db = null, conn = null;
+const logEntries = [];
+let chain = Promise.resolve();
+function serial(fn) { const p = chain.then(fn, fn); chain = p.catch(() => {}); return p; }
+function run(sql, label, opts = {}) {
+  return serial(async () => {
+    const t0 = performance.now();
+    const res = await conn.query(sql);
+    const ms = performance.now() - t0;
+    if (label) { logEntries.unshift({ label, sql: sql.trim(), ms }); if (logEntries.length > 80) logEntries.pop(); renderLog(); }
+    return { res, ms };
+  });
+}
+async function scalar(sql) {
+  const { res } = await run(sql);
+  const v = res.numRows ? res.getChildAt(0).get(0) : null;
+  return typeof v === 'bigint' ? Number(v) : v;
+}
+function toRows(res, limit = Infinity) {
+  const n = Math.min(res.numRows, limit), fields = res.schema.fields.map((f) => f.name), out = [];
+  const vecs = fields.map((_, i) => res.getChildAt(i));
+  for (let j = 0; j < n; j++) {
+    const o = {};
+    for (let i = 0; i < fields.length; i++) { let v = vecs[i].get(j); if (typeof v === 'bigint') v = Number(v); o[fields[i]] = v; }
+    out.push(o);
+  }
+  return out;
+}
+
+// ---------- view: base table + where + sort, materialized with __rn ----------
+class View {
+  constructor(base, name) { this.base = base; this.name = name; this.where = ''; this.sort = []; this.table = base; this.rowCount = 0; this.cols = []; this.gen = 0; }
+  async describe() {
+    const { res } = await run(`DESCRIBE ${qi(this.base)}`);
+    this.cols = toRows(res).filter((r) => r.column_name !== '__rn').map((r) => ({ name: r.column_name, type: r.column_type, kind: classify(r.column_type) }));
+  }
+  orderSql() { return this.sort.length ? 'ORDER BY ' + this.sort.map((s) => `${qi(s.col)} ${s.dir === 'desc' ? 'DESC' : 'ASC'} NULLS LAST`).join(', ') : ''; }
+  async build(label) {
+    this.gen++;
+    if (!this.where && !this.sort.length) {
+      if (this.table !== this.base) await run(`DROP TABLE IF EXISTS ${qi(this.name)}`);
+      this.table = this.base;
+    } else {
+      const sql = `CREATE OR REPLACE TEMP TABLE ${qi(this.name)} AS\nSELECT CAST(row_number() OVER () - 1 AS INTEGER) AS __rn, *\nFROM (SELECT * EXCLUDE (__rn) FROM ${qi(this.base)}${this.where ? '\nWHERE ' + this.where : ''}${this.sort.length ? '\n' + this.orderSql() : ''})`;
+      await run(sql, label);
+      this.table = this.name;
+    }
+    this.rowCount = await scalar(`SELECT count(*) FROM ${qi(this.table)}`);
+    this.gen++;
+  }
+  selectList() {
+    return this.cols.map((c) => {
+      if (isNumKind(c.kind)) return `CAST(${qi(c.name)} AS DOUBLE) AS ${qi(c.name)}`;
+      if (c.kind === 'bool') return qi(c.name);
+      return `CAST(${qi(c.name)} AS VARCHAR) AS ${qi(c.name)}`;
+    }).join(', ');
+  }
+}
+function toggleSort(view, col, add) {
+  const i = view.sort.findIndex((s) => s.col === col);
+  const cur = i >= 0 ? view.sort[i].dir : null;
+  const next = cur === null ? 'asc' : cur === 'asc' ? 'desc' : null;
+  if (add) {
+    if (i >= 0) { if (next) view.sort[i].dir = next; else view.sort.splice(i, 1); }
+    else view.sort.push({ col, dir: 'asc' });
+  } else {
+    view.sort = next ? [{ col, dir: next }] : [];
+  }
+  return next;
+}
+
+// ---------- canvas grid ----------
+const BLOCK = 256, MAXPX = 4000000;
+class Grid {
+  constructor(host, opts = {}) {
+    this.host = host; this.opts = opts; this.view = null; this.gen = -1;
+    this.cache = new Map(); this.pending = new Set(); this.pumping = false;
+    this.rowH = 26; this.headH = 34; this.vTop = 0; this.scale = 1; this.expected = 0;
+    this.sel = null; this.widths = {}; this.bars = null; this.message = opts.message || '';
+    this.cols = []; this.rnW = 56; this.totalW = 0; this.vw = 0; this.vh = 0; this.lastFetchMs = null;
+    host.classList.add('grid');
+    this.canvas = document.createElement('canvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.scroller = document.createElement('div'); this.scroller.className = 'grid-scroll'; this.scroller.tabIndex = 0;
+    this.scroller.setAttribute('role', 'grid'); this.scroller.setAttribute('aria-label', opts.label || 'Data grid');
+    this.spacer = document.createElement('div'); this.spacer.className = 'grid-spacer';
+    this.scroller.appendChild(this.spacer);
+    host.prepend(this.canvas, this.scroller);
+    this.bind();
+    new ResizeObserver(() => this.resize()).observe(host);
+    grids.push(this);
+    this.resize();
+  }
+  bind() {
+    const sc = this.scroller;
+    sc.addEventListener('scroll', () => {
+      if (this.scale > 1) { if (Math.abs(sc.scrollTop - this.expected) > 1) this.vTop = Math.min(this.maxV(), sc.scrollTop * this.scale); }
+      else this.vTop = sc.scrollTop;
+      this.invalidate();
+    }, { passive: true });
+    sc.addEventListener('wheel', (e) => {
+      if (this.scale <= 1) return;
+      e.preventDefault();
+      const unit = e.deltaMode === 1 ? this.rowH : e.deltaMode === 2 ? this.vh : 1;
+      this.setVTop(this.vTop + e.deltaY * unit);
+      if (e.deltaX) sc.scrollLeft += e.deltaX * unit;
+    }, { passive: false });
+    let down = null;
+    sc.addEventListener('pointerdown', (e) => {
+      const p = this.point(e); if (!p) return;
+      const h = this.hit(p.x, p.y);
+      if (h.edge >= 0) {
+        down = { type: 'resize', i: h.edge, x: p.x, w: this.cols[h.edge].w };
+        sc.setPointerCapture(e.pointerId); e.preventDefault(); return;
+      }
+      if (h.area === 'head' && h.col >= 0) { down = { type: 'head', col: h.col, x: p.x, y: p.y }; return; }
+      if (h.area === 'body' && h.row >= 0 && h.row < this.rowCount()) {
+        this.select(h.row, Math.max(0, h.col)); sc.focus({ preventScroll: true });
+      }
+    });
+    sc.addEventListener('pointermove', (e) => {
+      const p = this.point(e); if (!p) return;
+      if (down && down.type === 'resize') {
+        const c = this.cols[down.i];
+        this.widths[c.name] = Math.max(48, down.w + (p.x - down.x));
+        this.layout(); this.invalidate(); return;
+      }
+      const h = this.hit(p.x, p.y);
+      sc.style.cursor = h.edge >= 0 ? 'col-resize' : h.area === 'head' && h.col >= 0 ? 'pointer' : 'cell';
+    });
+    const up = (e) => {
+      if (down && down.type === 'head') {
+        const p = this.point(e, true);
+        if (p && Math.abs(p.x - down.x) < 5 && Math.abs(p.y - down.y) < 5 && this.opts.onSort) this.opts.onSort(this.cols[down.col].name, e.shiftKey);
+      }
+      down = null;
+    };
+    sc.addEventListener('pointerup', up);
+    sc.addEventListener('pointercancel', () => { down = null; });
+    sc.addEventListener('keydown', (e) => this.key(e));
+  }
+  point(e, any) {
+    const r = this.host.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    if (!any && (x > this.vw || y > this.vh)) return null;
+    return { x, y };
+  }
+  hit(x, y) {
+    const area = y < this.headH ? 'head' : 'body';
+    let col = -1, edge = -1;
+    if (x >= this.rnW) {
+      const cx = x - this.rnW + this.scroller.scrollLeft;
+      for (let i = 0; i < this.cols.length; i++) {
+        const c = this.cols[i];
+        if (cx >= c.left && cx < c.left + c.w) col = i;
+        if (area === 'head' && Math.abs(cx - (c.left + c.w)) <= 4) edge = i;
+      }
+    }
+    const row = area === 'body' ? Math.floor((y - this.headH + this.vTop) / this.rowH) : -1;
+    return { area, col, row, edge };
+  }
+  rowCount() { return this.view ? this.view.rowCount : 0; }
+  maxV() { return Math.max(0, this.rowCount() * this.rowH - (this.vh - this.headH)); }
+  setVTop(v) {
+    v = Math.max(0, Math.min(this.maxV(), v));
+    this.vTop = v;
+    this.expected = this.scale > 1 ? v / this.scale : v;
+    this.scroller.scrollTop = this.expected;
+    this.invalidate();
+  }
+  setView(view, opts = {}) {
+    this.view = view; this.gen = view.gen;
+    this.cache.clear(); this.pending.clear();
+    if (!opts.keepSel) this.sel = null;
+    if (opts.bars !== undefined) this.bars = opts.bars;
+    this.message = '';
+    this.layout();
+    this.setVTop(opts.keepScroll ? this.vTop : 0);
+    if (!opts.keepScroll) this.scroller.scrollLeft = 0;
+    this.invalidate();
+    this.opts.onSelect && this.opts.onSelect(null);
+  }
+  setMessage(m) { this.message = m; this.invalidate(); }
+  defaultWidth(c) {
+    const ctx = this.ctx; ctx.font = F_HEAD;
+    const head = ctx.measureText(c.name).width + 50;
+    const base = { int: 92, num: this.opts.numWidth || 110, date: 104, bool: 70, text: 128 }[c.kind] || 120;
+    return Math.min(260, Math.max(base, Math.ceil(head)));
+  }
+  layout() {
+    const view = this.view;
+    this.cols = view ? view.cols.map((c) => ({ ...c, w: this.widths[c.name] || (this.widths[c.name] = this.defaultWidth(c)) })) : [];
+    let left = 0; for (const c of this.cols) { c.left = left; left += c.w; }
+    this.ctx.font = F_NUM;
+    this.rnW = Math.max(52, Math.ceil(this.ctx.measureText(nf0.format(Math.max(1, this.rowCount()))).width) + 22);
+    this.totalW = this.rnW + left;
+    const contentH = this.headH + this.rowCount() * this.rowH;
+    const spacerH = Math.min(contentH, MAXPX);
+    this.scale = contentH > MAXPX ? this.maxV() / Math.max(1, spacerH - this.vh) : 1;
+    this.spacer.style.width = this.totalW + 'px';
+    this.spacer.style.height = spacerH + 'px';
+  }
+  resize() {
+    const sc = this.scroller;
+    this.vw = sc.clientWidth || this.host.clientWidth; this.vh = sc.clientHeight || this.host.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = Math.max(1, Math.round(this.vw * dpr)); this.canvas.height = Math.max(1, Math.round(this.vh * dpr));
+    this.canvas.style.width = this.vw + 'px'; this.canvas.style.height = this.vh + 'px';
+    this.dpr = dpr;
+    this.layout();
+    if (this.vTop > this.maxV()) this.setVTop(this.maxV());
+    this.invalidate();
+  }
+  invalidate() { if (this.raf) return; this.raf = requestAnimationFrame(() => { this.raf = 0; this.draw(); }); }
+  visibleRange() {
+    const first = Math.floor(this.vTop / this.rowH);
+    const n = Math.ceil((this.vh - this.headH) / this.rowH) + 1;
+    return [first, Math.min(this.rowCount() - 1, first + n)];
+  }
+  getRow(r) {
+    const b = Math.floor(r / BLOCK), blk = this.cache.get(b);
+    if (!blk) { this.request(b); return null; }
+    return blk[r - b * BLOCK] || null;
+  }
+  request(b) { if (!this.pending.has(b)) { this.pending.add(b); this.pump(); } }
+  async pump() {
+    if (this.pumping) return; this.pumping = true;
+    try {
+      while (this.pending.size) {
+        const [r0, r1] = this.visibleRange();
+        const b0 = Math.floor(r0 / BLOCK), b1 = Math.floor(Math.max(r0, r1) / BLOCK);
+        let best = null, bestD = Infinity;
+        for (const b of this.pending) { const d = b < b0 ? b0 - b : b > b1 ? b - b1 : 0; if (d < bestD) { bestD = d; best = b; } }
+        this.pending.delete(best);
+        if (bestD > 1 || this.cache.has(best)) continue;
+        await this.fetchBlock(best);
+      }
+    } finally { this.pumping = false; }
+  }
+  async fetchBlock(b) {
+    const view = this.view, gen = view.gen;
+    const sql = `SELECT ${view.selectList()} FROM ${qi(view.table)} WHERE __rn >= ${b * BLOCK} AND __rn < ${(b + 1) * BLOCK} ORDER BY __rn`;
+    try {
+      const { res, ms } = await run(sql);
+      if (view !== this.view || gen !== view.gen) return;
+      const n = res.numRows, vecs = view.cols.map((_, i) => res.getChildAt(i)), rows = new Array(n);
+      for (let j = 0; j < n; j++) { const row = new Array(vecs.length); for (let i = 0; i < vecs.length; i++) { const v = vecs[i].get(j); row[i] = typeof v === 'bigint' ? Number(v) : v; } rows[j] = row; }
+      this.cache.set(b, rows);
+      if (this.cache.size > 240) { const k = this.cache.keys().next().value; this.cache.delete(k); }
+      this.lastFetchMs = ms;
+      this.opts.onFetch && this.opts.onFetch(ms, b);
+      this.invalidate();
+    } catch (e) { console.warn('fetch failed', e); }
+  }
+  fmt(c, v) {
+    if (v === null || v === undefined) return null;
+    if (c.kind === 'int') return /(^|_)(id|year)$/i.test(c.name) ? String(v) : nf0.format(v);
+    if (c.kind === 'num') return Math.abs(v) >= 1e5 ? nf0.format(v) : nf2.format(v);
+    if (c.kind === 'bool') return v ? 'true' : 'false';
+    return String(v);
+  }
+  select(r, c) {
+    const n = this.rowCount(); if (!n || !this.cols.length) return;
+    r = Math.max(0, Math.min(n - 1, r)); c = Math.max(0, Math.min(this.cols.length - 1, c));
+    this.sel = { r, c }; this.ensureVisible(r, c); this.invalidate();
+    this.reportSel();
+  }
+  reportSel() {
+    if (!this.opts.onSelect || !this.sel) return;
+    const row = this.getRow(this.sel.r), col = this.cols[this.sel.c];
+    this.opts.onSelect({ r: this.sel.r, col, value: row ? row[this.sel.c] : undefined, text: row ? this.fmt(col, row[this.sel.c]) : '…' });
+  }
+  ensureVisible(r, c) {
+    const top = r * this.rowH, bodyH = this.vh - this.headH;
+    if (top < this.vTop) this.setVTop(top);
+    else if (top + this.rowH > this.vTop + bodyH) this.setVTop(top + this.rowH - bodyH);
+    const col = this.cols[c], sl = this.scroller.scrollLeft, avail = this.vw - this.rnW;
+    if (col.left < sl) this.scroller.scrollLeft = col.left;
+    else if (col.left + col.w > sl + avail) this.scroller.scrollLeft = col.left + col.w - avail;
+  }
+  key(e) {
+    if (!this.sel) { if (/^(Arrow|Page|Home|End)/.test(e.key)) { this.select(Math.floor(this.vTop / this.rowH), 0); e.preventDefault(); } return; }
+    const page = Math.max(1, Math.floor((this.vh - this.headH) / this.rowH) - 1);
+    let { r, c } = this.sel; const mod = e.metaKey || e.ctrlKey;
+    switch (e.key) {
+      case 'ArrowDown': r = mod ? this.rowCount() - 1 : r + 1; break;
+      case 'ArrowUp': r = mod ? 0 : r - 1; break;
+      case 'ArrowRight': c = mod ? this.cols.length - 1 : c + 1; break;
+      case 'ArrowLeft': c = mod ? 0 : c - 1; break;
+      case 'PageDown': r += page; break;
+      case 'PageUp': r -= page; break;
+      case 'Home': if (mod) r = 0; c = 0; break;
+      case 'End': if (mod) r = this.rowCount() - 1; c = this.cols.length - 1; break;
+      case 'c': case 'C':
+        if (mod) {
+          const row = this.getRow(r); const v = row ? row[c] : null;
+          if (v !== null && v !== undefined && navigator.clipboard) navigator.clipboard.writeText(String(v)).catch(() => {});
+          e.preventDefault();
+        }
+        return;
+      default: return;
+    }
+    e.preventDefault(); this.select(r, c);
+  }
+  draw() {
+    const ctx = this.ctx, t = theme(), W = this.vw, H = this.vh, dpr = this.dpr || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = t.surface; ctx.fillRect(0, 0, W, H);
+    ctx.textBaseline = 'middle';
+    const view = this.view;
+    if (!view || !this.cols.length) {
+      if (this.message) { ctx.fillStyle = t.muted; ctx.font = F_TEXT; ctx.textAlign = 'center'; ctx.fillText(this.message, W / 2, H / 2); ctx.textAlign = 'left'; }
+      return;
+    }
+    const rowH = this.rowH, headH = this.headH, sl = this.scroller.scrollLeft, n = this.rowCount();
+    const first = Math.floor(this.vTop / rowH), offY = headH - (this.vTop - first * rowH);
+    const vis = Math.ceil((H - headH) / rowH) + 1;
+    const rows = [];
+    for (let i = 0; i < vis; i++) { const r = first + i; if (r >= n) break; rows.push({ r, y: offY + i * rowH, d: this.getRow(r) }); }
+    // selected row tint
+    if (this.sel) { const y = headH + this.sel.r * rowH - this.vTop; if (y > headH - rowH && y < H) { ctx.fillStyle = t.rowSel; ctx.fillRect(0, y, W, rowH); } }
+    // cells, column by column
+    const x0 = this.rnW - sl;
+    for (let ci = 0; ci < this.cols.length; ci++) {
+      const c = this.cols[ci], x = x0 + c.left;
+      if (x + c.w < this.rnW || x > W) continue;
+      ctx.save(); ctx.beginPath(); ctx.rect(Math.max(x, this.rnW), headH, c.w, H - headH); ctx.clip();
+      const num = isNumKind(c.kind), barMax = this.bars && this.bars[c.name];
+      ctx.font = num ? F_NUM : F_TEXT;
+      for (const row of rows) {
+        const cy = row.y + rowH / 2;
+        if (!row.d) { ctx.fillStyle = t.skel; const bw = Math.min(c.w - 20, num ? 56 : 80); ctx.fillRect(num ? x + c.w - 10 - bw : x + 10, cy - 4, bw, 8); continue; }
+        const v = row.d[ci];
+        if (barMax && typeof v === 'number' && barMax > 0) { ctx.fillStyle = t.bar; const bw = Math.max(1, (Math.abs(v) / barMax) * (c.w - 12)); ctx.fillRect(x + 6, row.y + 5, bw, rowH - 10); }
+        const s = this.fmt(c, v);
+        if (s === null) { ctx.fillStyle = t.muted; ctx.textAlign = num ? 'right' : 'left'; ctx.fillText('null', num ? x + c.w - 10 : x + 10, cy); continue; }
+        ctx.fillStyle = t.fg;
+        if (num) { ctx.textAlign = 'right'; ctx.fillText(s, x + c.w - 10, cy); } else { ctx.textAlign = 'left'; ctx.fillText(s, x + 10, cy); }
+      }
+      ctx.restore();
+    }
+    ctx.textAlign = 'left';
+    // horizontal lines
+    ctx.fillStyle = t.lineSoft;
+    for (const row of rows) ctx.fillRect(0, Math.round(row.y + rowH) - 0.5, Math.min(W, this.totalW - sl), 1);
+    // vertical lines
+    ctx.fillStyle = t.lineSoft;
+    for (const c of this.cols) { const x = Math.round(x0 + c.left + c.w) - 0.5; if (x > this.rnW && x < W) ctx.fillRect(x, headH, 1, Math.min(H, headH + n * rowH - this.vTop) - headH); }
+    // selected cell outline
+    if (this.sel) {
+      const c = this.cols[this.sel.c], y = headH + this.sel.r * rowH - this.vTop, x = x0 + c.left;
+      if (y > headH - rowH && y < H) {
+        ctx.save(); ctx.beginPath(); ctx.rect(this.rnW, headH, W - this.rnW, H - headH); ctx.clip();
+        ctx.strokeStyle = t.accent; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, c.w - 2, rowH - 2); ctx.restore();
+      }
+    }
+    // frozen row-number column
+    ctx.fillStyle = t.head; ctx.fillRect(0, headH, this.rnW, H - headH);
+    ctx.font = F_NUM; ctx.textAlign = 'right';
+    for (const row of rows) {
+      const isSel = this.sel && this.sel.r === row.r;
+      if (isSel) { ctx.fillStyle = t.accentSoft; ctx.fillRect(0, row.y, this.rnW, rowH); }
+      ctx.fillStyle = isSel ? t.fg : t.muted; ctx.fillText(nf0.format(row.r + 1), this.rnW - 10, row.y + rowH / 2);
+    }
+    ctx.fillStyle = t.line; ctx.fillRect(this.rnW - 1, 0, 1, H);
+    // header
+    ctx.fillStyle = t.head; ctx.fillRect(0, 0, W, headH);
+    ctx.save(); ctx.beginPath(); ctx.rect(this.rnW, 0, W - this.rnW, headH); ctx.clip();
+    for (let ci = 0; ci < this.cols.length; ci++) {
+      const c = this.cols[ci], x = x0 + c.left;
+      if (x + c.w < this.rnW || x > W) continue;
+      if (this.sel && this.sel.c === ci) { ctx.fillStyle = t.accentSoft; ctx.fillRect(x, 0, c.w, headH); }
+      const si = view.sort.findIndex((s) => s.col === c.name);
+      const tag = { int: '123', num: '1.2', date: 'date', bool: 'y/n', text: 'abc' }[c.kind];
+      ctx.font = F_TAG; ctx.fillStyle = t.muted; ctx.textAlign = 'right';
+      let right = x + c.w - 8;
+      if (si >= 0) {
+        const s = view.sort[si];
+        ctx.fillStyle = t.accent; ctx.font = '600 11px "IBM Plex Mono", monospace';
+        const mark = (s.dir === 'asc' ? '▲' : '▼') + (view.sort.length > 1 ? si + 1 : '');
+        ctx.fillText(mark, right, headH / 2); right -= ctx.measureText(mark).width + 6;
+      } else { ctx.fillText(tag, right, headH / 2); right -= ctx.measureText(tag).width + 6; }
+      ctx.save(); ctx.beginPath(); ctx.rect(x, 0, Math.max(0, right - x - 2), headH); ctx.clip();
+      ctx.textAlign = 'left'; ctx.font = F_HEAD; ctx.fillStyle = si >= 0 ? t.accent : t.fg; ctx.fillText(c.name, x + 10, headH / 2);
+      ctx.restore();
+      ctx.fillStyle = t.line; ctx.fillRect(Math.round(x + c.w) - 0.5, 8, 1, headH - 16);
+    }
+    ctx.restore();
+    ctx.fillStyle = t.line; ctx.fillRect(0, headH - 1, W, 1);
+    // corner
+    ctx.fillStyle = t.head; ctx.fillRect(0, 0, this.rnW - 1, headH - 1);
+    ctx.fillStyle = t.muted; ctx.font = F_TAG; ctx.textAlign = 'right'; ctx.fillText('#', this.rnW - 10, headH / 2);
+    ctx.textAlign = 'left';
+    if (this.sel) this.reportSel();
+  }
+}
+
+// ---------- UI state ----------
+const ui = {
+  boot: $('#boot'), bootTitle: $('#bootTitle'), bootStep: $('#bootStep'), bootBar: $('#bootBar'),
+  stRows: $('#stRows'), stSel: $('#stSel'), stFetch: $('#stFetch'), stOp: $('#stOp'), stOpText: $('#stOpText'),
+  where: $('#whereInput'), whereErr: $('#whereErr'), chips: $('#chips'),
+  apply: $('#applyBtn'), clear: $('#clearBtn'), gen: $('#genBtn'), rowsSel: $('#rowsSel'), csv: $('#csvInput'), csvLabel: $('#csvLabel'),
+  pvRow1: $('#pvRow1'), pvRow2: $('#pvRow2'), pvCol: $('#pvCol'), pvAgg: $('#pvAgg'), pvMeasure: $('#pvMeasure'), pvMeta: $('#pvMeta'),
+  log: $('#log'),
+};
+function setBoot(step, frac) {
+  ui.bootStep.textContent = step;
+  if (frac === undefined || frac === null) ui.bootBar.classList.add('indet');
+  else { ui.bootBar.classList.remove('indet'); ui.bootBar.firstElementChild.style.width = Math.round(frac * 100) + '%'; }
+}
+let busyCount = 0, busyTimer = null;
+function busy(text) {
+  busyCount++;
+  const t0 = performance.now();
+  ui.stOp.className = 'pill busy';
+  const tick = () => { ui.stOpText.textContent = `${text} · ${fmtMs(performance.now() - t0)}`; };
+  tick(); clearInterval(busyTimer); busyTimer = setInterval(tick, 100);
+  setControls(false);
+  return (doneText) => {
+    busyCount--;
+    if (busyCount <= 0) {
+      busyCount = 0; clearInterval(busyTimer);
+      ui.stOp.className = 'pill idle';
+      ui.stOpText.textContent = doneText ? `${doneText} · ${fmtMs(performance.now() - t0)}` : 'Ready';
+      setControls(true);
+    }
+  };
+}
+function setControls(on) {
+  [ui.apply, ui.clear, ui.gen, ui.pvRow1, ui.pvRow2, ui.pvCol, ui.pvAgg, ui.pvMeasure, ...document.querySelectorAll('#insMeasure, #insDim, #insHeat')].forEach((el) => { el.disabled = !on; });
+  ui.csvLabel.style.pointerEvents = on ? '' : 'none'; ui.csvLabel.style.opacity = on ? '' : '0.5';
+}
+function renderLog() {
+  if (!logEntries.length) return;
+  ui.log.replaceChildren(...logEntries.map((e) => {
+    const li = document.createElement('li');
+    const r1 = document.createElement('div'); r1.className = 'row1';
+    const a = document.createElement('span'); a.textContent = e.label;
+    const b = document.createElement('span'); b.className = 'ms'; b.textContent = fmtMs(e.ms);
+    r1.append(a, b);
+    const pre = document.createElement('pre'); pre.textContent = e.sql;
+    li.append(r1, pre); return li;
+  }));
+}
+function updateRows() {
+  const n = main.rowCount, total = state.baseRows;
+  ui.stRows.innerHTML = '';
+  const b = document.createElement('b'); b.textContent = nf0.format(n);
+  ui.stRows.append(b, document.createTextNode(main.where ? ` of ${nf0.format(total)} rows` : ' rows'));
+}
+
+const state = { baseRows: 0, dataset: 'sales', dims: [], measures: [] };
+const main = new View('sales', '__view');
+const pv = new View('__pv', '__pvview');
+let fetchCount = 0;
+const grid = new Grid($('#mainGrid'), {
+  label: 'Data rows', message: 'Loading…',
+  onSort: (col, add) => { const d = toggleSort(main, col, add); rebuildMain(`Sort by ${col}${d ? (d === 'asc' ? ' ▲' : ' ▼') : ' (cleared)'}`); },
+  onSelect: (s) => {
+    if (!s) { ui.stSel.textContent = 'Click a cell to select it. Click a header to sort; Shift-click adds a second sort.'; return; }
+    ui.stSel.textContent = `Row ${nf0.format(s.r + 1)} · ${s.col.name} = ${s.text === null ? 'null' : s.text}`;
+  },
+  onFetch: (ms) => { fetchCount++; ui.stFetch.textContent = `Window fetch ${fmtMs(ms)} · ${nf0.format(BLOCK)} rows`; },
+});
+const pgrid = new Grid($('#pvGrid'), {
+  label: 'Pivot result', message: 'Pivot appears here', numWidth: 116,
+  onSort: (col, add) => { toggleSort(pv, col, add); buildPivotView(); },
+});
+
+// ---------- actions ----------
+async function rebuildMain(label, { pivotToo = false } = {}) {
+  const done = busy(main.sort.length ? `Sorting ${nf0.format(state.baseRows)} rows` : main.where ? 'Filtering' : 'Loading');
+  try {
+    await main.build(label);
+    grid.setView(main);
+    updateRows();
+    done(label);
+    if (pivotToo) await runPivot();
+  } catch (e) { done('Failed'); throw e; }
+}
+async function applyWhere(text) {
+  const prev = main.where;
+  main.where = text.trim();
+  ui.whereErr.hidden = true;
+  try {
+    await rebuildMain(main.where ? `Filter: ${main.where}` : 'Clear filter', { pivotToo: true });
+    onDataChanged();
+  } catch (e) {
+    ui.whereErr.textContent = cleanErr(e); ui.whereErr.hidden = false;
+    main.where = prev;
+    try { await rebuildMain('Restore previous filter'); onDataChanged(); } catch (e2) {}
+  }
+}
+function cleanErr(e) { return String(e && e.message || e).replace(/^Error:\s*/, '').split('\n').slice(0, 4).join('\n'); }
+
+const ENUMS = {
+  region: ['North America', 'Europe', 'Asia Pacific', 'Latin America', 'Middle East', 'Africa'],
+  channel: ['Online', 'Retail', 'Partner', 'Direct sales'],
+  category: ['Electronics', 'Home', 'Office', 'Outdoor', 'Apparel'],
+  segment: ['Consumer', 'Small business', 'Enterprise'],
+};
+function generateSql(n) {
+  const list = (k) => '[' + ENUMS[k].map(qs).join(', ') + ']';
+  const en = (k) => 'ENUM(' + ENUMS[k].map(qs).join(', ') + ')';
+  // Sample data with real structure: regional growth rates, Q4 seasonality,
+  // a rising Online channel share, and one regional dip (Europe, March 2025).
+  return `CREATE OR REPLACE TABLE sales AS
+WITH b AS (
+  SELECT range AS i, hash(range) AS h1, hash(range * 31 + 7) AS h2, hash(range * 131 + 3) AS h3
+  FROM range(0, ${n})
+), c AS (
+  SELECT i,
+    DATE '2023-01-01' + CAST(h1 % 1096 AS INTEGER) AS d,
+    CAST(h2 % 6 AS INTEGER) AS ri,
+    (h3 % 1000) / 1000.0 AS rc,
+    CAST((h3 >> 10) % 3 AS INTEGER) AS oc,
+    CAST((h1 >> 12) % 5 AS INTEGER) AS ci,
+    CAST((h2 >> 16) % 3 AS INTEGER) AS si,
+    1 + (h3 >> 20) % 12 AS bu,
+    CAST(round(8 + ((h1 >> 20) % 49000) / 100.0, 2) AS DOUBLE) AS unit_price,
+    CAST(((h2 >> 24) % 4) * 0.05 AS DECIMAL(3, 2)) AS discount
+  FROM b
+), e AS (
+  SELECT *, year(d) - 2023 AS yi, month(d) AS mo FROM c
+), f AS (
+  SELECT *,
+    [1.25, 1.10, 1.15, 0.85, 0.80, 0.70][ri + 1]
+      * (1 + [0.06, 0.03, 0.16, 0.08, 0.02, 0.10][ri + 1] * yi)
+      * [0.86, 0.84, 0.95, 0.97, 1.00, 0.98, 0.94, 0.96, 1.02, 1.06, 1.18, 1.32][mo]
+      * CASE WHEN ri = 1 AND yi = 2 AND mo = 3 THEN 0.6 ELSE 1 END
+      * [1.00, 1.05, 0.92, 1.12, 0.95][ci + 1] AS mult,
+    CASE WHEN rc < 0.26 + 0.08 * yi THEN 0 ELSE 1 + oc END AS chi
+  FROM e
+), g AS (
+  SELECT *, CAST(greatest(1, round(bu * mult)) AS TINYINT) AS units FROM f
+)
+SELECT
+  CAST(i AS INTEGER) AS __rn,
+  CAST(i + 100001 AS INTEGER) AS order_id,
+  d AS order_date,
+  CAST(${list('region')}[ri + 1] AS ${en('region')}) AS region,
+  CAST(${list('channel')}[chi + 1] AS ${en('channel')}) AS channel,
+  CAST(${list('category')}[ci + 1] AS ${en('category')}) AS category,
+  CAST(${list('segment')}[si + 1] AS ${en('segment')}) AS segment,
+  units, unit_price, discount,
+  CAST(round(units * unit_price * (1 - CAST(discount AS DOUBLE)), 2) AS DOUBLE) AS revenue
+FROM g`;
+}
+async function dropScratch() {
+  for (const t of ['__view', '__pvview', '__pv']) { try { await run(`DROP TABLE IF EXISTS ${qi(t)}`); } catch (e) {} }
+  main.table = main.base; pv.table = pv.base;
+}
+async function loadBase(base, label, sql, pivotDefaults) {
+  grid.view = null; pgrid.view = null; grid.setMessage(''); pgrid.setMessage('');
+  await dropScratch();
+  await run(sql, label);
+  main.base = base; main.table = base; main.where = ''; main.sort = []; ui.where.value = ''; ui.whereErr.hidden = true;
+  grid.widths = {}; pgrid.widths = {};
+  await main.describe();
+  state.baseRows = await scalar(`SELECT count(*) FROM ${qi(base)}`);
+  await main.build();
+  grid.setView(main);
+  updateRows();
+  buildPivotFields(pivotDefaults);
+  buildInsightFields();
+  try { CH.builder.hidden = true; CH.gallery.hidden = false; chState.rows = null; } catch (e) {}
+}
+async function generate(n) {
+  const done = busy(`Generating ${nf0.format(n)} rows`);
+  try {
+    try { await run('DROP TABLE IF EXISTS data'); } catch (e) {}
+    await loadBase('sales', `Generate ${nf0.format(n)} sales rows`, generateSql(n), { row1: 'region', col: 'channel', measure: 'revenue', agg: 'sum' });
+    state.dataset = 'sales';
+    ui.chips.hidden = false;
+    ui.where.placeholder = "region = 'Europe' AND revenue > 1000";
+    done(`Generated ${nf0.format(n)} rows`);
+    await runPivot();
+    onDataChanged();
+  } catch (e) { done('Generate failed'); showError(e); }
+}
+async function loadCsv(file) {
+  const done = busy(`Loading ${file.name}`);
+  try {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const reg = `upload_${Date.now()}.csv`;
+    await db.registerFileBuffer(reg, buf);
+    try { await run('DROP TABLE IF EXISTS sales'); } catch (e) {}
+    await loadBase('data', `Load ${file.name}`, `CREATE OR REPLACE TABLE data AS\nSELECT row_number() OVER () - 1 AS __rn, *\nFROM read_csv_auto(${qs(reg)})`, {});
+    try { await db.dropFile(reg); } catch (e) {}
+    state.dataset = file.name;
+    ui.chips.hidden = true;
+    const firstText = main.cols.find((c) => c.kind === 'text');
+    ui.where.placeholder = firstText ? `${firstText.name} = '…'` : 'column > 0';
+    done(`Loaded ${nf0.format(state.baseRows)} rows from ${file.name}`);
+    await runPivot();
+    onDataChanged();
+  } catch (e) { done('CSV load failed'); ui.whereErr.textContent = `Couldn't load ${file.name}: ${cleanErr(e)}`; ui.whereErr.hidden = false; }
+  ui.csv.value = '';
+}
+
+// ---------- pivot ----------
+function buildPivotFields(def = {}) {
+  const dims = [], measures = [{ key: '__rows', label: 'rows (count of records)', expr: '1', isRows: true }];
+  for (const c of main.cols) {
+    if (c.kind === 'text' || c.kind === 'bool') dims.push({ key: c.name, label: c.name, expr: `CAST(${qi(c.name)} AS VARCHAR)` });
+    if (c.kind === 'date') {
+      dims.push({ key: c.name + ':year', label: `${c.name} · year`, expr: `CAST(year(${qi(c.name)}) AS VARCHAR)` });
+      dims.push({ key: c.name + ':quarter', label: `${c.name} · quarter`, expr: `year(${qi(c.name)}) || '-Q' || quarter(${qi(c.name)})` });
+      dims.push({ key: c.name + ':month', label: `${c.name} · month`, expr: `strftime(${qi(c.name)}, '%Y-%m')` });
+    }
+    if (isNumKind(c.kind) && !/(^|_)id$/i.test(c.name)) measures.push({ key: c.name, label: c.name, expr: qi(c.name) });
+  }
+  state.dims = dims; state.measures = measures;
+  const opt = (v, l) => { const o = document.createElement('option'); o.value = v; o.textContent = l; return o; };
+  const fill = (sel, items, none) => { sel.replaceChildren(...(none ? [opt('', none)] : []), ...items.map((d) => opt(d.key, d.label))); };
+  fill(ui.pvRow1, dims); fill(ui.pvRow2, dims, '— no second row —'); fill(ui.pvCol, dims, '— no columns —'); fill(ui.pvMeasure, measures);
+  if (def.row1 && dims.some((d) => d.key === def.row1)) ui.pvRow1.value = def.row1;
+  ui.pvRow2.value = ''; ui.pvCol.value = def.col && dims.some((d) => d.key === def.col) ? def.col : '';
+  const m = measures.find((x) => x.key === def.measure) || measures[1] || measures[0];
+  ui.pvMeasure.value = m.key; ui.pvAgg.value = def.agg || 'sum';
+}
+function pivotSpec() {
+  return { row1: ui.pvRow1.value, row2: ui.pvRow2.value, col: ui.pvCol.value, measure: ui.pvMeasure.value, agg: ui.pvAgg.value };
+}
+const AGG_LABEL = { sum: 'Sum', avg: 'Average', count: 'Count', min: 'Min', max: 'Max' };
+async function runPivot() {
+  const s = pivotSpec();
+  const dimOf = (k) => state.dims.find((d) => d.key === k);
+  const r1 = dimOf(s.row1), r2 = s.row2 && s.row2 !== s.row1 ? dimOf(s.row2) : null, cd = s.col ? dimOf(s.col) : null;
+  const m = state.measures.find((x) => x.key === s.measure);
+  if (!r1 || !m) { pgrid.view = null; pgrid.setMessage('Pick a row field and a value'); return; }
+  let agg = s.agg; if (m.isRows) agg = 'sum';
+  const valLabel = m.isRows ? 'Rows' : `${AGG_LABEL[agg]} of ${m.label}`;
+  const rowDims = [r1, r2].filter(Boolean);
+  const rowSel = rowDims.map((d) => `${d.expr} AS ${qi(d.label)}`).join(', ');
+  const rowNames = rowDims.map((d) => qi(d.label));
+  const src = `${qi(main.base)}${main.where ? ' WHERE ' + main.where : ''}`;
+  const done = busy('Running pivot');
+  try {
+    let sql;
+    if (cd) {
+      const card = await scalar(`SELECT count(DISTINCT ${cd.expr}) FROM ${src}`);
+      if (card > 48) { done('Pivot not run'); ui.pvMeta.innerHTML = ''; const e = document.createElement('span'); e.className = 'err'; e.textContent = `${cd.label} has ${nf0.format(card)} distinct values. Pick a column field with 48 or fewer, or move it to Rows.`; ui.pvMeta.append(e); return; }
+      sql = `CREATE OR REPLACE TEMP TABLE __pv AS
+WITH s AS (
+  SELECT ${rowSel}, CAST(${cd.expr} AS VARCHAR) AS __col, ${m.expr} AS __m
+  FROM ${src}
+),
+p AS (PIVOT s ON __col USING ${agg}(__m) GROUP BY ${rowNames.join(', ')}),
+t AS (SELECT ${rowNames.join(', ')}, ${agg}(__m) AS __total FROM s GROUP BY ALL)
+SELECT row_number() OVER () - 1 AS __rn, * FROM (
+  SELECT p.*, t.__total AS "Total"
+  FROM p JOIN t ON ${rowNames.map((n) => `p.${n} IS NOT DISTINCT FROM t.${n}`).join(' AND ')}
+  ORDER BY ${rowNames.map((n) => 'p.' + n).join(', ')}
+)`;
+    } else {
+      sql = `CREATE OR REPLACE TEMP TABLE __pv AS
+SELECT row_number() OVER () - 1 AS __rn, * FROM (
+  SELECT ${rowSel}, ${agg}(${m.expr}) AS ${qi(valLabel)}${m.isRows ? '' : ', count(*) AS "Rows"'}
+  FROM ${src}
+  GROUP BY ALL ORDER BY ALL
+)`;
+    }
+    try { await run(`DROP TABLE IF EXISTS "__pvview"`); } catch (e) {}
+    const { ms } = await run(sql, `Pivot: ${valLabel} by ${rowDims.map((d) => d.label).join(', ')}${cd ? ' × ' + cd.label : ''}`);
+    pv.base = '__pv'; pv.table = '__pv'; pv.where = ''; pv.sort = [];
+    pgrid.widths = {};
+    await pv.describe();
+    await pv.build();
+    const numCols = pv.cols.filter((c) => isNumKind(c.kind));
+    let bars = null;
+    if (numCols.length) {
+      const { res } = await run(`SELECT ${numCols.map((c) => `max(abs(CAST(${qi(c.name)} AS DOUBLE))) AS ${qi(c.name)}`).join(', ')} FROM "__pv"`);
+      bars = toRows(res)[0];
+      if (cd) { const shared = Math.max(...numCols.filter((c) => c.name !== 'Total').map((c) => bars[c.name] || 0)); numCols.forEach((c) => { if (c.name !== 'Total') bars[c.name] = shared; }); }
+    }
+    pgrid.setView(pv, { bars });
+    ui.pvMeta.innerHTML = '';
+    const b = document.createElement('b'); b.textContent = `${nf0.format(pv.rowCount)} groups`;
+    ui.pvMeta.append(b, document.createTextNode(` · ${fmtMs(ms)} over ${nf0.format(main.rowCount)} rows${main.where ? ' (filtered)' : ''}`));
+    done('Pivot ready');
+  } catch (e) {
+    done('Pivot failed');
+    ui.pvMeta.innerHTML = ''; const er = document.createElement('span'); er.className = 'err'; er.textContent = cleanErr(e); ui.pvMeta.append(er);
+  }
+}
+async function buildPivotView() {
+  const done = busy('Sorting pivot');
+  try { await pv.build(); pgrid.setView(pv, { keepSel: false }); done('Pivot sorted'); } catch (e) { done('Sort failed'); }
+}
+
+// ---------- error display ----------
+function showError(e) {
+  ui.boot.hidden = false; ui.boot.classList.add('error');
+  ui.bootTitle.textContent = "DuckDB couldn't start here";
+  ui.bootBar.hidden = true;
+  ui.bootStep.textContent = `${cleanErr(e)}\n\nThis page needs WebAssembly and Web Workers. Try a current desktop Chrome, Edge, Safari or Firefox.`;
+  ui.bootStep.style.whiteSpace = 'pre-wrap';
+  ui.stOp.className = 'pill'; ui.stOpText.textContent = 'Engine unavailable';
+}
+
+// ---------- wiring ----------
+ui.apply.addEventListener('click', () => applyWhere(ui.where.value));
+ui.where.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !ui.apply.disabled) applyWhere(ui.where.value); });
+ui.clear.addEventListener('click', () => { ui.where.value = ''; applyWhere(''); });
+ui.chips.addEventListener('click', (e) => { const c = e.target.closest('.chip'); if (!c || ui.apply.disabled) return; ui.where.value = c.textContent; applyWhere(c.textContent); });
+ui.gen.addEventListener('click', () => generate(+ui.rowsSel.value));
+ui.csv.addEventListener('change', () => { const f = ui.csv.files && ui.csv.files[0]; if (f) loadCsv(f); });
+[ui.pvRow1, ui.pvRow2, ui.pvCol, ui.pvAgg, ui.pvMeasure].forEach((el) => el.addEventListener('change', () => runPivot()));
+for (const [tab, panel] of [[$('#tabPivot'), $('#panelPivot')], [$('#tabLog'), $('#panelLog')]]) {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+    document.querySelectorAll('.tabpanel').forEach((p) => { p.hidden = p !== panel; });
+    if (panel.id === 'panelPivot') pgrid.resize();
+  });
+}
+setControls(false);
+try { if (matchMedia('(max-width: 900px)').matches) ui.rowsSel.value = '1000000'; } catch (e) {}
+
+// ---------- agent / script API ----------
+window.duckgrid = {
+  async sql(query, limit = 1000) { const { res } = await run(query, 'API: sql()'); return toRows(res, limit); },
+  async filter(where = '') { ui.where.value = where; await applyWhere(where); return { rows: main.rowCount, where: main.where }; },
+  async sort(col, dir = 'asc') { main.sort = col ? [{ col, dir }] : []; await rebuildMain(col ? `Sort by ${col} ${dir === 'desc' ? '▼' : '▲'}` : 'Clear sort'); return { rows: main.rowCount, sort: main.sort }; },
+  async pivot({ rows = [], column = '', measure = '', agg = 'sum' } = {}) {
+    if (rows[0]) ui.pvRow1.value = rows[0]; ui.pvRow2.value = rows[1] || ''; ui.pvCol.value = column || '';
+    if (measure) ui.pvMeasure.value = measure; ui.pvAgg.value = agg;
+    await runPivot(); return window.duckgrid.sql('SELECT * EXCLUDE (__rn) FROM "__pv" ORDER BY __rn', 500);
+  },
+  async insights() { if (insDirty || !insData) await refreshInsights(); const d = insData; return { period: d.P ? { current: [d.P.cur[0], d.P.cur[d.P.cur.length - 1]], previous: [d.P.prior[0], d.P.prior[d.P.prior.length - 1]] } : null, kpis: d.kpis.map((k) => ({ label: k.label, value: k.value, change: k.delta })), insights: d.cards.map((c) => ({ kind: c.kind, text: c.parts.map((x) => x[0]).join(''), filter: c.action ? c.action.cond : null })), breakdown: d.members.slice(0, 50).map((x) => ({ key: x.k, value: x.v, previous: x.pv, share: x.share, change: x.delta })) }; },
+  chartTypes() { return CHARTS.map((c) => ({ id: c.id, name: c.name, bestFor: c.best, fields: c.fields.map(([k, label, type]) => ({ key: k, label, type })), available: !chartAvailable(c), reason: chartAvailable(c) })); },
+  async chart(type, fields = {}) { showView('charts'); openChart(type, fields); await new Promise((r) => setTimeout(r, 0)); while (busyCount) await new Promise((r) => setTimeout(r, 50)); return { spec: chartSpec(), rows: (chState.rows || []).slice(0, 200) }; },
+  state() { return { table: main.base, rows: main.rowCount, totalRows: state.baseRows, where: main.where, sort: main.sort, columns: main.cols.map((c) => ({ name: c.name, type: c.type })), pivotFields: state.dims.map((d) => d.key), measures: state.measures.map((m) => m.key) }; },
+};
+
+// ---------- insights ----------
+const ins = {
+  root: $('#insights'), measure: $('#insMeasure'), dim: $('#insDim'), heat: $('#insHeat'), period: $('#insPeriod'),
+  kpis: $('#kpis'), trend: $('#trend'), trendTitle: $('#trendTitle'), trendSub: $('#trendSub'), legend: $('#trendLegend'),
+  list: $('#insightList'), bars: $('#bars'), barsTitle: $('#barsTitle'), barsSub: $('#barsSub'),
+  heatEl: $('#heat'), heatTitle: $('#heatTitle'), heatSub: $('#heatSub'), heatCard: $('#heatCard'), trendCard: $('#trendCard'), tip: $('#tip'),
+};
+let insDirty = true, insGen = 0, insData = null, currentView = 'insights';
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const ymLabel = (ym, short) => { const [y, m] = ym.split('-'); return short ? `${MON[+m - 1]} ’${y.slice(2)}` : `${MON[+m - 1]} ${y}`; };
+const isCurrency = (n) => /(revenue|price|amount|sales|cost|profit|spend|income)/i.test(n);
+const aggFor = (n) => (/(price|rate|discount|pct|percent|avg|ratio|score)/i.test(n) ? 'avg' : 'sum');
+function compact(v, cur) {
+  if (v === null || v === undefined || !isFinite(v)) return '—';
+  const a = Math.abs(v), t = (x, d) => x.toFixed(d).replace(/\.0+$/, '');
+  let s;
+  if (a >= 1e9) s = t(a / 1e9, a >= 1e10 ? 0 : 1) + 'B';
+  else if (a >= 1e6) s = t(a / 1e6, a >= 1e7 ? 0 : 1) + 'M';
+  else if (a >= 1e4) s = t(a / 1e3, 0) + 'K';
+  else if (a >= 1e3) s = t(a / 1e3, 1) + 'K';
+  else if (a < 100 && a % 1) s = a.toFixed(2);
+  else s = nf0.format(a);
+  return (v < 0 ? '−' : '') + (cur ? '$' : '') + s;
+}
+const full = (v, cur) => (v === null || !isFinite(v) ? '—' : (cur ? '$' : '') + (Math.abs(v) >= 100 || v % 1 === 0 ? nf0.format(v) : nf2.format(v)));
+const pct = (x, d = 1) => (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x * 100).toFixed(d) + '%';
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+const SVGNS = 'http://www.w3.org/2000/svg';
+const svg = (tag, attrs = {}, cls) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (cls) e.setAttribute('class', cls); return e; };
+
+function measureList() {
+  const out = [{ key: '__count', name: null, label: state.dataset === 'sales' ? 'Orders' : 'Rows', noun: state.dataset === 'sales' ? 'orders' : 'rows', agg: 'sum', currency: false }];
+  for (const c of main.cols) {
+    if (!isNumKind(c.kind) || /(^|_)id$/i.test(c.name)) continue;
+    const agg = aggFor(c.name);
+    out.push({ key: c.name, name: c.name, label: `${c.name.replace(/_/g, ' ')} · ${agg === 'avg' ? 'average' : 'total'}`, noun: agg === 'avg' ? `average ${c.name.replace(/_/g, ' ')}` : c.name.replace(/_/g, ' '), agg, currency: isCurrency(c.name) });
+  }
+  return out;
+}
+function currentMeasure() { return measureList().find((m) => m.key === ins.measure.value) || measureList()[0]; }
+function buildInsightFields() {
+  const opt = (v, l) => { const o = document.createElement('option'); o.value = v; o.textContent = l; return o; };
+  const meas = measureList();
+  ins.measure.replaceChildren(...meas.map((m) => opt(m.key, m.label)));
+  ins.measure.value = (meas.find((m) => m.key === 'revenue') || meas[1] || meas[0]).key;
+  const dims = main.cols.filter((c) => c.kind === 'text' || c.kind === 'bool').map((c) => c.name);
+  ins.dim.replaceChildren(opt('', '— none —'), ...dims.map((d) => opt(d, d)));
+  ins.heat.replaceChildren(opt('', '— none —'), ...dims.map((d) => opt(d, d)));
+  ins.dim.value = dims[0] || '';
+  ins.heat.value = dims.find((d) => d !== ins.dim.value && /channel/i.test(d)) || dims.find((d) => d !== ins.dim.value) || '';
+  state.dateCol = (main.cols.find((c) => c.kind === 'date') || {}).name || null;
+  insDirty = true;
+}
+function periodsOf(months) {
+  if (months.length < 2) return null;
+  const L = Math.min(12, Math.floor(months.length / 2));
+  return { L, cur: months.slice(-L), prior: months.slice(-2 * L, -L) };
+}
+let chDirty = false;
+function onDataChanged() { insDirty = true; chDirty = true; if (currentView === 'insights') refreshInsights(); if (currentView === 'charts') { if (!CH.builder.hidden) { chDirty = false; runChart(); } else renderGallery(); } }
+
+async function refreshInsights() {
+  if (!conn || !main.cols.length) return;
+  const gen = ++insGen; insDirty = false;
+  const m = currentMeasure(), dim = ins.dim.value, heat = ins.heat.value !== dim ? ins.heat.value : '', dc = state.dateCol;
+  const src = `${qi(main.base)}${main.where ? ' WHERE ' + main.where : ''}`;
+  const mx = m.key === '__count' ? '1' : `CAST(${qi(m.name)} AS DOUBLE)`;
+  const kExpr = dim ? `CAST(${qi(dim)} AS VARCHAR)` : `'All'`;
+  const tExpr = dc ? `strftime(${qi(dc)}, '%Y-%m')` : `NULL`;
+  const done = busy('Computing insights');
+  try {
+    const q1 = `SELECT ${kExpr} AS k, ${tExpr} AS ym,\n  sum(${mx}) AS s, count(${mx}) AS c, count(*) AS n\nFROM ${src}\nGROUP BY ALL`;
+    const r1 = toRows((await run(q1, `Insights: ${m.noun}${dim ? ' by ' + dim : ''}${dc ? ' and month' : ''}`)).res);
+    const months = dc ? [...new Set(r1.map((r) => r.ym).filter(Boolean))].sort() : [];
+    const P = periodsOf(months);
+    let r2 = [];
+    if (heat && dim) {
+      let pf = '';
+      if (P) {
+        const cs = `${qi(dc)} >= DATE '${P.cur[0]}-01'`, ps = `${qi(dc)} >= DATE '${P.prior[0]}-01' AND ${qi(dc)} < DATE '${P.cur[0]}-01'`;
+        pf = `,\n  sum(${mx}) FILTER (WHERE ${cs}) AS s_cur, count(${mx}) FILTER (WHERE ${cs}) AS c_cur,\n  sum(${mx}) FILTER (WHERE ${ps}) AS s_prior, count(${mx}) FILTER (WHERE ${ps}) AS c_prior`;
+      }
+      r2 = toRows((await run(`SELECT ${kExpr} AS a, CAST(${qi(heat)} AS VARCHAR) AS b,\n  sum(${mx}) AS s, count(${mx}) AS c${pf}\nFROM ${src}\nGROUP BY ALL`, `Insights: ${m.noun} by ${dim} × ${heat}`)).res);
+    }
+    if (gen !== insGen) { done(); return; }
+    insData = analyze(r1, r2, m, dim, heat, dc, P);
+    renderInsights();
+    done('Insights ready');
+  } catch (e) {
+    done('Insights failed');
+    ins.list.replaceChildren(el('li', 'err', cleanErr(e)));
+  }
+}
+
+function analyze(r1, r2, m, dim, heat, dc, P) {
+  const V = (s, c) => (m.agg === 'avg' ? (c ? s / c : null) : s);
+  const curSet = new Set(P ? P.cur : []), priorSet = new Set(P ? P.prior : []);
+  const byMonth = new Map(), byKey = new Map();
+  const tot = { s: 0, c: 0, n: 0, cs: 0, cc: 0, cn: 0, ps: 0, pc: 0, pn: 0 };
+  for (const r of r1) {
+    const s = r.s || 0, c = r.c || 0, n = r.n || 0;
+    tot.s += s; tot.c += c; tot.n += n;
+    const k = byKey.get(r.k) || { k: r.k, s: 0, c: 0, n: 0, cs: 0, cc: 0, ps: 0, pc: 0, months: new Map() };
+    k.s += s; k.c += c; k.n += n;
+    if (r.ym) {
+      const mo = byMonth.get(r.ym) || { s: 0, c: 0, n: 0 }; mo.s += s; mo.c += c; mo.n += n; byMonth.set(r.ym, mo);
+      k.months.set(r.ym, { s, c });
+      if (curSet.has(r.ym)) { k.cs += s; k.cc += c; tot.cs += s; tot.cc += c; tot.cn += n; }
+      else if (priorSet.has(r.ym)) { k.ps += s; k.pc += c; tot.ps += s; tot.pc += c; tot.pn += n; }
+    }
+    byKey.set(r.k, k);
+  }
+  const months = [...byMonth.keys()].sort();
+  const series = months.map((ym) => { const o = byMonth.get(ym); return { ym, v: V(o.s, o.c), n: o.n, s: o.s }; });
+  const idx = new Map(series.map((p) => [p.ym, p]));
+  for (const p of series) { const [y, mm] = p.ym.split('-'); const q = idx.get(`${+y - 1}-${mm}`); p.pv = q ? q.v : null; }
+
+  // KPI tiles
+  const kpis = [];
+  const head = P ? V(tot.cs, tot.cc) : V(tot.s, tot.c), headPrior = P ? V(tot.ps, tot.pc) : null;
+  kpis.push({ label: P ? `${cap(m.noun)} · last ${P.L} months` : cap(m.noun), value: head, delta: headPrior ? head / headPrior - 1 : null, currency: m.currency, spark: series.map((p) => p.v) });
+  if (m.key !== '__count') {
+    const lbl = state.dataset === 'sales' ? 'Orders' : 'Rows';
+    kpis.push({ label: P ? `${lbl} · last ${P.L} months` : lbl, value: P ? tot.cn : tot.n, delta: P && tot.pn ? tot.cn / tot.pn - 1 : null, currency: false, spark: series.map((p) => p.n) });
+    if (m.agg === 'sum') {
+      const per = P ? tot.cs / (tot.cn || 1) : tot.s / (tot.n || 1), perPrior = P && tot.pn ? tot.ps / tot.pn : null;
+      kpis.push({ label: `${cap(m.noun)} per ${state.dataset === 'sales' ? 'order' : 'row'}`, value: per, delta: perPrior ? per / perPrior - 1 : null, currency: m.currency, spark: series.map((p) => (p.n ? p.s / p.n : null)), precise: true });
+    }
+  }
+
+  // breakdown
+  let members = [...byKey.values()].map((k) => ({ k: k.k, v: P ? V(k.cs, k.cc) : V(k.s, k.c), pv: P ? V(k.ps, k.pc) : null, raw: k }));
+  members.sort((a, b) => (b.v || 0) - (a.v || 0));
+  const sumV = members.reduce((a, b) => a + (b.v || 0), 0);
+  members.forEach((x) => { x.share = m.agg === 'sum' && sumV ? x.v / sumV : null; x.delta = x.pv ? x.v / x.pv - 1 : null; });
+
+  // insight cards
+  const cards = [];
+  const range = P ? `${ymLabel(P.cur[0])} – ${ymLabel(P.cur[P.cur.length - 1])}` : '';
+  const noun = m.noun;
+  if (P && headPrior) {
+    const d = head / headPrior - 1;
+    cards.push({ kind: 'Trend', tone: d >= 0 ? 'up' : 'down', parts: [[`${cap(noun)} for the last ${P.L} months (${range}) was `], [compact(head, m.currency), 'b'], [d >= 0 ? ', up ' : ', down '], [pct(Math.abs(d)).replace('+', ''), d >= 0 ? 'up' : 'down'], [` on the previous ${P.L} months.`]] });
+  }
+  if (dim && members.length > 1 && m.agg === 'sum' && members[0].share) {
+    const top = members[0];
+    cards.push({ kind: 'Leader', parts: [[top.k, 'b'], [` is the largest ${dim}, with `], [(top.share * 100).toFixed(1) + '%', 'b'], [` of ${noun}${P ? ` in the last ${P.L} months` : ''}.`]], action: { label: `Filter to ${top.k}`, cond: `${qi(dim)} = ${qs(top.k)}` } });
+  }
+  if (dim && P) {
+    const movers = members.filter((x) => x.delta !== null && (x.share === null || x.share >= 0.02));
+    if (movers.length > 1) {
+      movers.sort((a, b) => b.delta - a.delta);
+      const hi = movers[0], lo = movers[movers.length - 1];
+      cards.push({ kind: 'Mover', tone: hi.delta >= 0 ? 'up' : 'down', parts: [[hi.k, 'b'], [hi.delta >= 0 ? ' grew fastest at ' : ' held up best at '], [pct(hi.delta), hi.delta >= 0 ? 'up' : 'down'], ['; '], [lo.k, 'b'], [lo.delta < 0 ? ' declined ' : ' grew least, at '], [pct(lo.delta), lo.delta >= 0 ? 'up' : 'down'], [` versus the previous ${P.L} months.`]], action: { label: `Filter to ${hi.k}`, cond: `${qi(dim)} = ${qs(hi.k)}` } });
+    }
+  }
+  let anomaly = null;
+  if (dim && P && dc) {
+    for (const x of members) {
+      const k = x.raw;
+      const g = m.agg === 'sum' ? (k.ps ? k.cs / k.ps : null) : 1;
+      if (!g) continue;
+      for (const ym of P.cur) {
+        const a = k.months.get(ym); const [y, mm] = ym.split('-'); const b = k.months.get(`${+y - 1}-${mm}`);
+        if (!a || !b) continue;
+        const av = V(a.s, a.c), bv = V(b.s, b.c); if (!bv) continue;
+        const exp = bv * g, dev = av / exp - 1;
+        if (Math.abs(dev) >= 0.15 && (!anomaly || Math.abs(dev) > Math.abs(anomaly.dev))) anomaly = { k: x.k, ym, dev, prevYm: `${+y - 1}-${mm}`, g };
+      }
+    }
+    if (anomaly) {
+      const start = `DATE '${anomaly.ym}-01'`;
+      cards.push({ kind: 'Anomaly', tone: anomaly.dev < 0 ? 'down' : 'up', parts: [[anomaly.k, 'b'], [` in ${ymLabel(anomaly.ym)} came in `], [pct(Math.abs(anomaly.dev), 0).replace('+', '') + (anomaly.dev < 0 ? ' below' : ' above'), anomaly.dev < 0 ? 'down' : 'up'], [` what its trend predicts, based on ${ymLabel(anomaly.prevYm)} and its ${pct(anomaly.g - 1)} yearly change.`]], action: { label: 'Show these rows', cond: `${qi(dim)} = ${qs(anomaly.k)} AND ${qi(dc)} >= ${start} AND ${qi(dc)} < ${start} + INTERVAL 1 MONTH` } });
+    }
+  }
+  if (dc && months.length >= 24 && m.agg === 'sum') {
+    const byYear = new Map();
+    for (const p of series) { const y = p.ym.slice(0, 4); const a = byYear.get(y) || []; a.push(p); byYear.set(y, a); }
+    const cal = Array.from({ length: 12 }, () => []);
+    for (const arr of byYear.values()) { if (arr.length < 12) continue; const mean = arr.reduce((s, p) => s + p.v, 0) / arr.length; for (const p of arr) cal[+p.ym.slice(5) - 1].push(p.v / mean); }
+    const avg = cal.map((a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : null));
+    if (avg.every((v) => v !== null)) {
+      let hi = 0, lo = 0; avg.forEach((v, i) => { if (v > avg[hi]) hi = i; if (v < avg[lo]) lo = i; });
+      if (avg[hi] - avg[lo] > 0.08) cards.push({ kind: 'Seasonality', parts: [[MONTH_FULL[hi], 'b'], [' is the strongest month, averaging '], [pct(avg[hi] - 1, 0), 'b'], [' against a typical month; '], [MONTH_FULL[lo], 'b'], [' is the weakest at '], [pct(avg[lo] - 1, 0), 'b'], ['.']] });
+    }
+  }
+  // heatmap + mix
+  let heatData = null;
+  if (heat && dim && r2.length) {
+    const as = members.map((x) => x.k).slice(0, 24), aSet = new Set(as);
+    const bTot = new Map();
+    for (const r of r2) bTot.set(r.b, (bTot.get(r.b) || 0) + (r.s || 0));
+    const bs = [...bTot.entries()].sort((a, b) => b[1] - a[1]).slice(0, 16).map((e) => e[0]), bSet = new Set(bs);
+    const cells = new Map(); let max = 0, min = Infinity;
+    const rowTot = new Map();
+    for (const r of r2) {
+      if (!aSet.has(r.a) || !bSet.has(r.b)) continue;
+      const v = P ? V(r.s_cur || 0, r.c_cur || 0) : V(r.s, r.c);
+      cells.set(r.a + '\u0000' + r.b, v);
+      rowTot.set(r.a, (rowTot.get(r.a) || 0) + (v || 0));
+      if (v !== null) { max = Math.max(max, v); min = Math.min(min, v); }
+    }
+    heatData = { as, bs, cells, max, min: min === Infinity ? 0 : min, rowTot };
+    if (P && m.agg === 'sum') {
+      const cur = new Map(), pri = new Map(); let ct = 0, pt = 0;
+      for (const r of r2) { cur.set(r.b, (cur.get(r.b) || 0) + (r.s_cur || 0)); pri.set(r.b, (pri.get(r.b) || 0) + (r.s_prior || 0)); ct += r.s_cur || 0; pt += r.s_prior || 0; }
+      if (ct && pt) {
+        let best = null;
+        for (const b of cur.keys()) { const a = cur.get(b) / ct, p = (pri.get(b) || 0) / pt, d = a - p; if (!best || Math.abs(d) > Math.abs(best.d)) best = { b, a, p, d }; }
+        if (best && Math.abs(best.d) >= 0.01) cards.push({ kind: 'Mix shift', tone: best.d >= 0 ? 'up' : 'down', parts: [[best.b, 'b'], [`’s share of ${noun} moved from `], [(best.p * 100).toFixed(1) + '%', 'b'], [' to '], [(best.a * 100).toFixed(1) + '%', 'b'], [' ('], [(best.d >= 0 ? '+' : '−') + Math.abs(best.d * 100).toFixed(1) + ' pts', best.d >= 0 ? 'up' : 'down'], [').']], action: { label: `Filter to ${best.b}`, cond: `${qi(heat)} = ${qs(best.b)}` } });
+      }
+    }
+  }
+  return { m, dim, heat, dc, P, series, kpis, members, cards, anomaly, heatData, range, sumV };
+}
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// ---------- rendering ----------
+function renderInsights() {
+  if (!insData) return;
+  const d = insData;
+  ins.period.textContent = d.P ? `Comparing ${d.range} with the ${d.P.L} months before.${main.where ? ' Filter applied.' : ''}` : (main.where ? 'Filter applied.' : '');
+  renderKpis(d); renderTrend(d); renderList(d); renderBars(d); renderHeat(d);
+}
+function deltaEl(delta, suffix) {
+  const s = el('span', 'delta ' + (delta >= 0 ? 'up' : 'down'));
+  s.textContent = `${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta * 100).toFixed(1)}%`;
+  if (suffix) s.append(el('span', 'delta-sfx', ' ' + suffix));
+  return s;
+}
+function sparkline(values, w = 120, h = 30) {
+  const pts = values.map((v, i) => [i, v]).filter((p) => p[1] !== null && isFinite(p[1]));
+  const s = svg('svg', { viewBox: `0 0 ${w} ${h}`, width: w, height: h, 'aria-hidden': 'true' }, 'spark');
+  if (pts.length < 2) return s;
+  const lo = Math.min(...pts.map((p) => p[1])), hi = Math.max(...pts.map((p) => p[1])), n = values.length - 1;
+  const X = (i) => 2 + (i / n) * (w - 6), Y = (v) => h - 4 - ((v - lo) / (hi - lo || 1)) * (h - 8);
+  s.append(svg('path', { d: pts.map((p, j) => (j ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('') }, 'sp-line'));
+  const last = pts[pts.length - 1];
+  s.append(svg('circle', { cx: X(last[0]), cy: Y(last[1]), r: 2.5 }, 'sp-dot'));
+  return s;
+}
+function renderKpis(d) {
+  ins.kpis.replaceChildren(...d.kpis.map((k) => {
+    const t = el('div', 'kpi');
+    t.append(el('div', 'kpi-label', k.label));
+    const row = el('div', 'kpi-row');
+    row.append(el('div', 'kpi-value', k.precise ? (k.currency ? '$' : '') + nf2.format(k.value || 0) : compact(k.value, k.currency)), sparkline(k.spark));
+    t.append(row);
+    if (k.delta !== null && isFinite(k.delta)) t.append(deltaEl(k.delta, `vs previous ${d.P ? d.P.L : ''} months`));
+    else t.append(el('span', 'delta-sfx', 'No earlier period to compare'));
+    return t;
+  }));
+}
+function niceScale(lo, hi, n = 4) {
+  if (!(hi > lo)) hi = lo + 1;
+  const raw = (hi - lo) / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const st = [1, 2, 2.5, 5, 10].map((x) => x * p).find((x) => x >= raw);
+  const start = Math.floor(lo / st) * st, ticks = [];
+  for (let v = start; v < hi + st * 0.999; v += st) ticks.push(+v.toPrecision(12));
+  return ticks;
+}
+function renderTrend(d) {
+  const host = ins.trend; host.replaceChildren();
+  ins.trendTitle.textContent = `${cap(d.m.noun)} by month`;
+  ins.trendCard.hidden = !d.dc || d.series.length < 2;
+  if (ins.trendCard.hidden) return;
+  ins.trendSub.textContent = d.anomaly ? 'Dashed line: the same month a year earlier. Marker: the anomaly below.' : 'Dashed line: the same month a year earlier.';
+  const S = d.series, n = S.length, W = Math.max(280, host.clientWidth), H = 250, ml = 56, mr = 14, mt = 18, mb = 28;
+  const iw = W - ml - mr, ih = H - mt - mb;
+  const vals = S.flatMap((p) => [p.v, p.pv]).filter((v) => v !== null && isFinite(v));
+  let lo = d.m.agg === 'sum' ? 0 : Math.min(...vals) * 0.96, hi = Math.max(...vals);
+  const ticks = niceScale(lo, hi); lo = ticks[0]; hi = ticks[ticks.length - 1];
+  const X = (i) => ml + (n === 1 ? iw / 2 : (i * iw) / (n - 1)), Y = (v) => mt + ih - ((v - lo) / (hi - lo)) * ih;
+  const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': `${d.m.noun} by month line chart` }, 'trend-svg');
+  const g = svg('g', {}, 'ax');
+  for (const t of ticks) {
+    g.append(svg('line', { x1: ml, x2: W - mr, y1: Y(t), y2: Y(t) }, t === lo ? 'base' : 'gl'));
+    const tx = svg('text', { x: ml - 8, y: Y(t), 'text-anchor': 'end', 'dominant-baseline': 'middle' }); tx.textContent = compact(t, d.m.currency); g.append(tx);
+  }
+  const ppm = iw / Math.max(1, n - 1), every = ppm >= 30 ? 3 : ppm >= 15 ? 6 : 12;
+  S.forEach((p, i) => {
+    const mm = +p.ym.slice(5);
+    if ((mm - 1) % every !== 0) return;
+    const tx = svg('text', { x: X(i), y: H - 8, 'text-anchor': 'middle' }); tx.textContent = mm === 1 ? ymLabel(p.ym, true) : MON[mm - 1]; g.append(tx);
+  });
+  s.append(g);
+  const path = (key) => { let dstr = '', pen = false; S.forEach((p, i) => { const v = p[key]; if (v === null || !isFinite(v)) { pen = false; return; } dstr += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); pen = true; }); return dstr; };
+  const area = 'M' + X(0) + ' ' + Y(lo) + S.map((p, i) => 'L' + X(i).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join('') + 'L' + X(n - 1) + ' ' + Y(lo) + 'Z';
+  s.append(svg('path', { d: area }, 'ar'), svg('path', { d: path('pv') }, 'pl'), svg('path', { d: path('v') }, 'ln'));
+  // anomaly annotation
+  if (d.anomaly) {
+    const i = S.findIndex((p) => p.ym === d.anomaly.ym);
+    if (i >= 0) {
+      const ga = svg('g', {}, 'ann');
+      ga.append(svg('line', { x1: X(i), x2: X(i), y1: mt - 4, y2: Y(S[i].v) - 7 }));
+      ga.append(svg('circle', { cx: X(i), cy: Y(S[i].v), r: 6 }, 'ann-ring'));
+      const tx = svg('text', { x: X(i) + (X(i) > W - 150 ? -6 : 6), y: mt + 2, 'text-anchor': X(i) > W - 150 ? 'end' : 'start' });
+      tx.textContent = `${d.anomaly.k} ${pct(d.anomaly.dev, 0)}`; ga.append(tx);
+      s.append(ga);
+    }
+  }
+  const last = S[n - 1];
+  s.append(svg('circle', { cx: X(n - 1), cy: Y(last.v), r: 4 }, 'dot'));
+  // hover layer
+  const hov = svg('g', { visibility: 'hidden' });
+  const xh = svg('line', { y1: mt, y2: mt + ih }, 'xh'), d1 = svg('circle', { r: 4 }, 'dot'), d2 = svg('circle', { r: 3.5 }, 'dot2');
+  hov.append(xh, d2, d1); s.append(hov);
+  const hit = svg('rect', { x: ml, y: mt, width: iw, height: ih, fill: 'transparent' });
+  s.append(hit);
+  const move = (e) => {
+    const r = s.getBoundingClientRect(), px = (e.clientX - r.left) * (W / r.width);
+    const i = Math.max(0, Math.min(n - 1, Math.round(((px - ml) / iw) * (n - 1))));
+    const p = S[i];
+    hov.setAttribute('visibility', 'visible');
+    xh.setAttribute('x1', X(i)); xh.setAttribute('x2', X(i));
+    d1.setAttribute('cx', X(i)); d1.setAttribute('cy', Y(p.v));
+    if (p.pv !== null) { d2.setAttribute('visibility', 'visible'); d2.setAttribute('cx', X(i)); d2.setAttribute('cy', Y(p.pv)); } else d2.setAttribute('visibility', 'hidden');
+    const rows = [[ymLabel(p.ym), null, 'tip-title'], ['line', `${cap(d.m.noun)}`, full(p.v, d.m.currency)]];
+    if (p.pv !== null) { rows.push(['dash', 'Same month, prior year', full(p.pv, d.m.currency)]); rows.push([null, 'Year over year', pct(p.v / p.pv - 1)]); }
+    if (d.m.key !== '__count') rows.push([null, state.dataset === 'sales' ? 'Orders' : 'Rows', nf0.format(p.n)]);
+    showTip(e, rows);
+  };
+  hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move);
+  hit.addEventListener('pointerleave', () => { hov.setAttribute('visibility', 'hidden'); hideTip(); });
+  host.append(s);
+  ins.legend.replaceChildren(legendItem('line', cap(d.m.noun)), legendItem('dash', 'Same month, prior year'));
+}
+function legendItem(kind, text) { const s = el('span', 'lg'); s.append(el('i', 'sw ' + kind), document.createTextNode(text)); return s; }
+function showTip(e, rows) {
+  const t = ins.tip; t.replaceChildren();
+  for (const [kind, label, value] of rows) {
+    if (value === 'tip-title') { t.append(el('div', 'tip-title', kind)); continue; }
+    const r = el('div', 'tip-row');
+    const l = el('span', 'tip-l'); if (kind) { const sw = el('i', 'sw ' + (kind.startsWith('c:') ? 'dotc' : kind)); if (kind.startsWith('c:')) sw.style.background = kind.slice(2); l.append(sw); } l.append(document.createTextNode(label));
+    r.append(l, el('span', 'tip-v', value)); t.append(r);
+  }
+  t.hidden = false;
+  const w = t.offsetWidth, h = t.offsetHeight;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + w > innerWidth - 8) x = e.clientX - w - 14;
+  if (y + h > innerHeight - 8) y = e.clientY - h - 14;
+  t.style.left = Math.max(8, x) + 'px'; t.style.top = Math.max(8, y) + 'px';
+}
+function hideTip() { ins.tip.hidden = true; }
+function renderList(d) {
+  if (!d.cards.length) { ins.list.replaceChildren(el('li', 'ins-empty', 'No notable patterns for this selection. Try a different measure or breakdown.')); return; }
+  ins.list.replaceChildren(...d.cards.map((c) => {
+    const li = el('li', 'ins');
+    li.append(el('span', 'ins-kind', c.kind));
+    const p = el('p', 'ins-text');
+    for (const [txt, style] of c.parts) {
+      if (style === 'b') p.append(el('strong', '', txt));
+      else if (style === 'up' || style === 'down') { const s = el('strong', 'chg ' + style); s.textContent = (style === 'up' ? '▲ ' : '▼ ') + txt.replace(/^[+−-]/, ''); p.append(s); }
+      else p.append(document.createTextNode(txt));
+    }
+    li.append(p);
+    if (c.action) { const b = el('button', 'ins-act', c.action.label + ' →'); b.addEventListener('click', () => addFilter(c.action.cond)); li.append(b); }
+    return li;
+  }));
+}
+function renderBars(d) {
+  const host = ins.bars; host.replaceChildren();
+  ins.barsTitle.textContent = d.dim ? `${cap(d.m.noun)} by ${d.dim}` : cap(d.m.noun);
+  ins.barsSub.textContent = d.P ? `Last ${d.P.L} months, change vs the ${d.P.L} before. Click a bar to filter.` : 'Click a bar to filter.';
+  let rows = d.members.slice();
+  if (rows.length > 12 && d.m.agg === 'sum') {
+    const rest = rows.slice(11); rows = rows.slice(0, 11);
+    const v = rest.reduce((a, b) => a + (b.v || 0), 0), pv = rest.reduce((a, b) => a + (b.pv || 0), 0);
+    rows.push({ k: `Other (${rest.length})`, v, pv, share: d.sumV ? v / d.sumV : null, delta: pv ? v / pv - 1 : null, other: true });
+  }
+  const max = Math.max(...rows.map((r) => Math.abs(r.v || 0)), 1);
+  for (const r of rows) {
+    const b = el('button', 'bar-row'); b.type = 'button';
+    if (r.other || !d.dim) b.disabled = true;
+    const lab = el('span', 'bar-label', r.k === null ? 'null' : r.k); lab.title = r.k;
+    const tr = el('span', 'bar-track'); const fill = el('i'); fill.style.width = Math.max(0.5, (Math.abs(r.v || 0) / max) * 100) + '%'; tr.append(fill);
+    const val = el('span', 'bar-val', compact(r.v, d.m.currency));
+    if (r.share !== null && r.share !== undefined) val.append(el('small', '', ` ${(r.share * 100).toFixed(1)}%`));
+    b.append(lab, tr, val, r.delta !== null && isFinite(r.delta) ? deltaEl(r.delta) : el('span', 'delta-sfx', ''));
+    b.addEventListener('pointermove', (e) => showTip(e, [[r.k, null, 'tip-title'], ['bar', d.P ? `Last ${d.P.L} months` : cap(d.m.noun), full(r.v, d.m.currency)], ...(r.pv ? [[null, `Previous ${d.P.L} months`, full(r.pv, d.m.currency)], [null, 'Change', pct(r.delta)]] : []), ...(r.share ? [[null, 'Share', (r.share * 100).toFixed(1) + '%']] : [])]));
+    b.addEventListener('pointerleave', hideTip);
+    if (!b.disabled) b.addEventListener('click', () => addFilter(`${qi(d.dim)} = ${qs(r.k)}`));
+    host.append(b);
+  }
+}
+const RAMP_LIGHT = ['#cde2fb', '#b7d3f6', '#9ec5f4', '#86b6ef', '#6da7ec', '#5598e7', '#3987e5', '#2a78d6', '#256abf', '#1c5cab', '#184f95', '#104281', '#0d366b'];
+function rampColor(t) {
+  const dark = getComputedStyle(document.documentElement).getPropertyValue('--heat-dark').trim() === '1';
+  const ramp = dark ? RAMP_LIGHT.slice().reverse() : RAMP_LIGHT;
+  const hex = ramp[Math.max(0, Math.min(ramp.length - 1, Math.round(t * (ramp.length - 1))))];
+  const n = parseInt(hex.slice(1), 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return { bg: hex, fg: L > 0.32 ? '#0b0b0b' : '#ffffff' };
+}
+function renderHeat(d) {
+  const host = ins.heatEl; host.replaceChildren();
+  const H = d.heatData;
+  ins.heatCard.hidden = !H;
+  if (!H) return;
+  ins.heatTitle.textContent = `${d.dim} × ${d.heat}`;
+  ins.heatSub.textContent = `${cap(d.m.noun)}${d.P ? `, last ${d.P.L} months` : ''}. Color runs from the lowest to the highest cell (scale below). Click a cell to filter.`;
+  const gridEl = el('div', 'heat-grid'); gridEl.style.gridTemplateColumns = `minmax(96px, max-content) repeat(${H.bs.length}, minmax(64px, 1fr))`;
+  gridEl.append(el('span', 'heat-corner'));
+  for (const b of H.bs) { const h = el('span', 'heat-col', b); h.title = b; gridEl.append(h); }
+  for (const a of H.as) {
+    const rl = el('span', 'heat-row', a); rl.title = a; gridEl.append(rl);
+    for (const b of H.bs) {
+      const v = H.cells.get(a + '\u0000' + b);
+      const c = el('button', 'heat-cell'); c.type = 'button';
+      if (v === undefined || v === null) { c.disabled = true; c.textContent = '–'; gridEl.append(c); continue; }
+      const t = (v - H.min) / ((H.max - H.min) || 1), col = rampColor(t);
+      c.style.background = col.bg; c.style.color = col.fg; c.textContent = compact(v, d.m.currency);
+      const share = d.m.agg === 'sum' && H.rowTot.get(a) ? v / H.rowTot.get(a) : null;
+      c.addEventListener('pointermove', (e) => showTip(e, [[`${a} · ${b}`, null, 'tip-title'], [null, cap(d.m.noun), full(v, d.m.currency)], ...(share !== null ? [[null, `Share of ${a}`, (share * 100).toFixed(1) + '%']] : [])]));
+      c.addEventListener('pointerleave', hideTip);
+      c.addEventListener('click', () => addFilter(`${qi(d.dim)} = ${qs(a)} AND ${qi(d.heat)} = ${qs(b)}`));
+      gridEl.append(c);
+    }
+  }
+  const wrap = el('div', 'heat-wrap'); wrap.append(gridEl); host.append(wrap);
+  const lg = el('div', 'heat-legend');
+  const bar = el('span', 'heat-ramp');
+  const dark = getComputedStyle(document.documentElement).getPropertyValue('--heat-dark').trim() === '1';
+  bar.style.background = `linear-gradient(90deg, ${(dark ? RAMP_LIGHT.slice().reverse() : RAMP_LIGHT).join(', ')})`;
+  lg.append(el('span', '', compact(H.min, d.m.currency)), bar, el('span', '', compact(H.max, d.m.currency)));
+  host.append(lg);
+}
+function addFilter(cond) {
+  if (busyCount) return;
+  const w = main.where;
+  if (w && w.includes(cond)) return;
+  const next = w ? `${w} AND ${cond}` : cond;
+  ui.where.value = next;
+  applyWhere(next);
+}
+function showView(v) {
+  currentView = v;
+  document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.view === v)));
+  $('#mainGrid').hidden = v !== 'table';
+  ins.root.hidden = v !== 'insights';
+  $('#charts').hidden = v !== 'charts';
+  hideTip();
+  if (v === 'table') grid.resize();
+  else if (v === 'charts') { if (CH.builder.hidden) renderGallery(); else if (chDirty) { chDirty = false; runChart(); } else drawChart(); }
+  else if (insDirty) refreshInsights(); else renderInsights();
+}
+document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
+[ins.measure, ins.dim, ins.heat].forEach((s) => s.addEventListener('change', () => refreshInsights()));
+let insW = 0;
+new ResizeObserver(() => { const w = ins.root.clientWidth; if (w && Math.abs(w - insW) > 4 && insData && currentView === 'insights') { insW = w; renderTrend(insData); } }).observe(ins.root);
+
+// ---------- D3 chart gallery + builder ----------
+const CH = {
+  root: $('#charts'), gallery: $('#gallery'), builder: $('#builder'), cards: $('#chartCards'),
+  title: $('#chTitle'), best: $('#chBest'), fields: $('#chFields'), area: $('#chArea'), legend: $('#chLegend'),
+  spec: $('#chSpec'), back: $('#chBack'), note: $('#chNote'),
+};
+const HAS_D3 = typeof d3 !== 'undefined';
+const PAL = ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)', 'var(--c7)', 'var(--c8)'];
+const OTHER = 'var(--c-other)';
+let chState = { type: null, fields: {}, rows: null, gen: 0 };
+
+// fields available on the current dataset
+function chDims() {
+  const out = main.cols.filter((c) => c.kind === 'text' || c.kind === 'bool').map((c) => ({ key: c.name, label: c.name, expr: `CAST(${qi(c.name)} AS VARCHAR)`, ordered: false }));
+  const dc = state.dateCol;
+  if (dc) {
+    out.push({ key: dc + ':year', label: `${dc} · year`, expr: `CAST(year(${qi(dc)}) AS VARCHAR)`, ordered: true });
+    out.push({ key: dc + ':quarter', label: `${dc} · quarter`, expr: `'Q' || quarter(${qi(dc)})`, ordered: true });
+    out.push({ key: dc + ':moy', label: `${dc} · month of year`, expr: `strftime(${qi(dc)}, '%m')`, ordered: true, fmt: (v) => (v ? MON[+v - 1] : v) });
+  }
+  return out;
+}
+function chMeasures(sumOnly) {
+  return measureList().filter((m) => !sumOnly || m.agg === 'sum').map((m) => ({ ...m, sql: m.key === '__count' ? 'count(*)' : `${m.agg}(CAST(${qi(m.name)} AS DOUBLE))` }));
+}
+const dimOf = (k) => chDims().find((d) => d.key === k);
+const measOf = (k) => chMeasures().find((m) => m.key === k);
+const lab = (d, v) => (v === null || v === undefined ? 'null' : d && d.fmt ? d.fmt(v) : String(v));
+
+// ---------- chart registry ----------
+const CHARTS = [
+  { id: 'bar', name: 'Ranked bars', best: 'Which category is biggest. The safest default.', fields: [['cat', 'Category', 'cat'], ['measure', 'Value', 'measure']] },
+  { id: 'stacked', name: 'Stacked bars', best: 'Totals per category and what makes them up.', fields: [['cat', 'Category', 'cat'], ['series', 'Split by', 'cat'], ['measure', 'Value', 'measureSum']] },
+  { id: 'line', name: 'Line over time', best: 'Trends and turning points across months.', needs: 'date', fields: [['series', 'One line per', 'cat?'], ['measure', 'Value', 'measure']] },
+  { id: 'stream', name: 'Streamgraph', best: 'How the mix of groups shifts over time.', needs: 'date', fields: [['series', 'Layer by', 'cat'], ['measure', 'Value', 'measureSum']] },
+  { id: 'multiples', name: 'Small multiples', best: 'Comparing the shape of many trends side by side.', needs: 'date', fields: [['series', 'One panel per', 'cat'], ['measure', 'Value', 'measure']] },
+  { id: 'heatmap', name: 'Heatmap', best: 'Spotting hot spots across two dimensions.', fields: [['cat', 'Rows', 'cat'], ['cat2', 'Columns', 'cat'], ['measure', 'Value', 'measure']] },
+  { id: 'calendar', name: 'Calendar heatmap', best: 'Daily patterns, weekdays and seasons.', needs: 'date', fields: [['measure', 'Value', 'measure']] },
+  { id: 'treemap', name: 'Treemap', best: 'Part-to-whole with two levels of grouping.', fields: [['cat', 'Group', 'cat'], ['cat2', 'Inside each group', 'cat'], ['measure', 'Size', 'measureSum']] },
+  { id: 'sunburst', name: 'Sunburst', best: 'A two-level hierarchy as rings.', fields: [['cat', 'Inner ring', 'cat'], ['cat2', 'Outer ring', 'cat'], ['measure', 'Size', 'measureSum']] },
+  { id: 'donut', name: 'Donut', best: 'Shares of a whole, for a handful of parts.', fields: [['cat', 'Slices', 'cat'], ['measure', 'Value', 'measureSum']] },
+  { id: 'scatter', name: 'Bubble scatter', best: 'How two measures relate across groups.', needs: 'measures2', fields: [['cat', 'One bubble per', 'cat'], ['cat2', 'Color by', 'cat?'], ['x', 'Horizontal', 'measure'], ['y', 'Vertical', 'measure']] },
+];
+const chartDef = (id) => CHARTS.find((c) => c.id === id);
+function chartAvailable(c) {
+  if (c.needs === 'date' && !state.dateCol) return 'Needs a date column';
+  if (c.needs === 'measures2' && chMeasures().length < 3) return 'Needs two numeric columns';
+  const dims = chDims().length;
+  if (c.fields.filter((f) => f[2] === 'cat').length > dims) return 'Needs more text columns';
+  return null;
+}
+function defaultFields(c) {
+  const dims = chDims().filter((d) => !d.ordered), allDims = chDims(), ms = chMeasures(), sumMs = chMeasures(true);
+  const pick = (arr, pref, avoid = []) => (arr.find((x) => pref.test(x.key) && !avoid.includes(x.key)) || arr.find((x) => !avoid.includes(x.key)) || arr[0] || {}).key;
+  const f = {};
+  const measure = pick(ms, /revenue|amount|sales/i), measureSum = pick(sumMs, /revenue|amount|sales/i);
+  for (const [k, , type] of c.fields) {
+    if (type === 'measure') f[k] = measure;
+    if (type === 'measureSum') f[k] = measureSum;
+  }
+  const d1 = pick(dims.length ? dims : allDims, /region|country|state|city/i);
+  const d2 = pick(dims.length > 1 ? dims : allDims, /channel|category|segment/i, [d1]);
+  if (c.id === 'scatter') {
+    f.cat = pick(dims, /category|product/i) || d1; f.cat2 = (dims.find((d) => /segment/i.test(d.key) && d.key !== f.cat) || {}).key || '';
+    f.x = pick(ms.filter((m) => m.agg === 'avg'), /price/i) || ms[1]?.key; f.y = pick(ms, /revenue|amount/i, [f.x]);
+    return f;
+  }
+  if ('cat' in Object.fromEntries(c.fields)) f.cat = d1;
+  if (c.fields.some((x) => x[0] === 'cat2')) f.cat2 = d2;
+  if (c.fields.some((x) => x[0] === 'series')) f.series = c.id === 'line' ? '' : (c.id === 'multiples' ? d1 : d2);
+  if (c.id === 'line') f.series = d2 && /channel/i.test(d2) ? d2 : '';
+  if (c.id === 'stacked') { f.cat = d1; f.series = d2; }
+  return f;
+}
+
+// ---------- SQL ----------
+function chartSql(c, f) {
+  const src = `${qi(main.base)}${main.where ? ' WHERE ' + main.where : ''}`;
+  const D = (k) => dimOf(k).expr, M = (k) => measOf(k).sql, dc = state.dateCol;
+  const whereAnd = (cond) => (main.where ? `${qi(main.base)} WHERE (${main.where}) AND ${cond}` : `${qi(main.base)} WHERE ${cond}`);
+  switch (c.id) {
+    case 'bar': case 'donut':
+      return `SELECT ${D(f.cat)} AS k, ${M(f.measure)} AS v\nFROM ${src}\nGROUP BY 1 ORDER BY v DESC NULLS LAST LIMIT ${c.id === 'bar' ? 30 : 60}`;
+    case 'stacked':
+      return `SELECT ${D(f.cat)} AS k, ${D(f.series)} AS s, ${M(f.measure)} AS v\nFROM ${src}\nGROUP BY ALL`;
+    case 'heatmap': case 'treemap': case 'sunburst':
+      return `SELECT ${D(f.cat)} AS a, ${D(f.cat2)} AS b, ${M(f.measure)} AS v\nFROM ${src}\nGROUP BY ALL`;
+    case 'line': case 'stream': case 'multiples':
+      return `SELECT strftime(date_trunc('month', ${qi(dc)}), '%Y-%m-%d') AS t, ${f.series ? D(f.series) : "'All'"} AS s, ${M(f.measure)} AS v\nFROM ${whereAnd(`${qi(dc)} IS NOT NULL`)}\nGROUP BY ALL ORDER BY 1`;
+    case 'calendar':
+      return `SELECT strftime(${qi(dc)}, '%Y-%m-%d') AS t, ${M(f.measure)} AS v\nFROM ${whereAnd(`${qi(dc)} IS NOT NULL`)}\nGROUP BY 1 ORDER BY 1`;
+    case 'scatter':
+      return `SELECT ${D(f.cat)} AS k, ${f.cat2 ? D(f.cat2) : 'NULL'} AS g, ${M(f.x)} AS x, ${M(f.y)} AS y, count(*) AS n\nFROM ${src}\nGROUP BY ALL LIMIT 2000`;
+  }
+}
+
+// ---------- helpers ----------
+function foldTop(keys, totals, max) {
+  const sorted = keys.slice().sort((a, b) => (totals.get(b) || 0) - (totals.get(a) || 0));
+  if (sorted.length <= max) return { keep: sorted, other: false };
+  return { keep: sorted.slice(0, max - 1), other: true };
+}
+function orderKeys(keys, dim, totals) {
+  if (dim && dim.ordered) return keys.slice().sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+  return keys.slice().sort((a, b) => (totals.get(b) || 0) - (totals.get(a) || 0));
+}
+function mkSvg(el, W, H, label) {
+  return d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', W).attr('height', H).attr('class', 'd3c').attr('role', 'img').attr('aria-label', label);
+}
+function axisFmt(scale, ticks, currency) {
+  const t = scale.ticks(ticks), step = t.length > 1 ? Math.abs(t[1] - t[0]) : 1, max = d3.max(t, (v) => Math.abs(v)) || 1;
+  if (max < 1000) { const dec = Math.max(0, d3.precisionFixed(step)); return (v) => (v < 0 ? '−' : '') + (currency ? '$' : '') + nf0.format(Math.trunc(Math.abs(v))) + (dec ? (Math.abs(v) % 1).toFixed(dec).slice(1) : ''); }
+  const f = d3.formatPrefix('.' + d3.precisionPrefix(step, max), max);
+  return (v) => (v < 0 ? '−' : '') + (currency ? '$' : '') + f(Math.abs(v)).replace('G', 'B');
+}
+function yGrid(g, y, x0, x1, fmt, ticks = 5, currency) {
+  const ax = g.append('g').attr('class', 'ax').attr('transform', `translate(${x0},0)`)
+    .call(d3.axisLeft(y).ticks(ticks).tickSize(-(x1 - x0)).tickPadding(8).tickFormat(axisFmt(y, ticks, fmt === true)));
+  ax.select('.domain').remove(); ax.selectAll('.tick line').attr('class', 'gl');
+}
+function xGrid(g, x, y0, y1, fmt, ticks = 5) {
+  const ax = g.append('g').attr('class', 'ax').attr('transform', `translate(0,${y1})`)
+    .call(d3.axisBottom(x).ticks(ticks).tickSize(-(y1 - y0)).tickPadding(8).tickFormat(axisFmt(x, ticks, fmt === true)));
+  ax.select('.domain').remove(); ax.selectAll('.tick line').attr('class', 'gl');
+}
+function barPathH(x, y, w, h, r) { r = Math.min(r, w, h / 2); return `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`; }
+function barPathV(x, y, w, h, r) { r = Math.min(r, h, w / 2); return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`; }
+function setLegend(items) {
+  CH.legend.replaceChildren(...items.map(([color, text]) => { const s = el('span', 'lg'); const i = el('i', 'sw dotc'); i.style.background = color; s.append(i, document.createTextNode(text)); return s; }));
+}
+function tipFor(e, title, rows) { showTip(e, [[title, null, 'tip-title'], ...rows]); }
+const parseDay = (s) => new Date(s + 'T00:00:00');
+
+// ---------- renderers: (el, rows, meta, opt) ----------
+const R = {};
+R.bar = (el, rows, meta, opt) => {
+  const W = opt.W, mini = opt.mini, n = rows.length;
+  const m = mini ? { l: 6, r: 6, t: 6, b: 6 } : { l: Math.min(170, 24 + d3.max(rows, (r) => meta.catLab(r.k).length) * 7), r: 70, t: 6, b: 28 };
+  const H = mini ? opt.H : Math.max(200, n * 28 + m.t + m.b);
+  const s = mkSvg(el, W, H, 'Ranked bar chart'); const g = s.append('g');
+  const y = d3.scaleBand(rows.map((r) => r.k), [m.t, H - m.b]).padding(0.28);
+  const x = d3.scaleLinear([0, d3.max(rows, (r) => r.v) || 1], [m.l, W - m.r]).nice();
+  if (!mini) {
+    xGrid(g, x, m.t, H - m.b, meta.currency);
+    g.append('g').attr('class', 'ax lbl').selectAll('text').data(rows).join('text').attr('x', m.l - 10).attr('y', (r) => y(r.k) + y.bandwidth() / 2).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').text((r) => meta.catLab(r.k));
+  }
+  g.append('g').selectAll('path').data(rows).join('path').attr('class', 'mark').style('fill', PAL[0])
+    .attr('d', (r) => barPathH(x(0), y(r.k), Math.max(1, x(r.v) - x(0)), y.bandwidth(), 4))
+    .on('pointermove', (e, r) => tipFor(e, meta.catLab(r.k), [['c:' + PAL[0], meta.mLabel, full(r.v, meta.currency)]]))
+    .on('pointerleave', hideTip).on('click', (e, r) => meta.pick && meta.pick({ cat: r.k }));
+  if (!mini) g.append('g').attr('class', 'vlab').selectAll('text').data(rows).join('text').attr('x', (r) => x(r.v) + 6).attr('y', (r) => y(r.k) + y.bandwidth() / 2).attr('dominant-baseline', 'middle').text((r) => compact(r.v, meta.currency));
+  if (!mini) setLegend([]);
+};
+R.stacked = (el, rows, meta, opt) => {
+  const W = opt.W, H = opt.H, mini = opt.mini;
+  const tot = d3.rollup(rows, (v) => d3.sum(v, (r) => r.v), (r) => r.k), stot = d3.rollup(rows, (v) => d3.sum(v, (r) => r.v), (r) => r.s);
+  let cats = orderKeys([...tot.keys()], meta.catDim, tot).slice(0, 20);
+  const fold = foldTop([...stot.keys()], stot, 8);
+  const series = orderKeys(fold.keep, meta.seriesDim, stot).concat(fold.other ? ['Other'] : []);
+  const table = cats.map((k) => { const o = { k }; series.forEach((s) => (o[s] = 0)); return o; });
+  const idx = new Map(table.map((o) => [o.k, o]));
+  for (const r of rows) { const o = idx.get(r.k); if (!o) continue; const s = fold.keep.includes(r.s) ? r.s : 'Other'; o[s] += r.v || 0; }
+  const stack = d3.stack().keys(series)(table);
+  const m = mini ? { l: 6, r: 6, t: 6, b: 6 } : { l: 64, r: 12, t: 10, b: 52 };
+  const s = mkSvg(el, W, H, 'Stacked bar chart'); const g = s.append('g');
+  const x = d3.scaleBand(cats, [m.l, W - m.r]).padding(0.25);
+  const y = d3.scaleLinear([0, d3.max(table, (o) => d3.sum(series, (k) => o[k])) || 1], [H - m.b, m.t]).nice();
+  if (!mini) {
+    yGrid(g, y, m.l, W - m.r, meta.currency);
+    const xa = g.append('g').attr('class', 'ax').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).tickSize(0).tickPadding(10).tickFormat((k) => meta.catLab(k)));
+    xa.select('.domain').attr('class', 'base');
+    if (x.bandwidth() < 60) xa.selectAll('text').attr('transform', 'rotate(-30)').attr('text-anchor', 'end').attr('dx', '-4').attr('dy', '4');
+  }
+  const color = (i, key) => (key === 'Other' ? OTHER : PAL[i]);
+  g.append('g').selectAll('g').data(stack).join('g').style('fill', (d, i) => color(i, d.key))
+    .selectAll('rect').data((d) => d.map((p) => Object.assign(p, { key: d.key }))).join('rect').attr('class', 'mark seg')
+    .attr('x', (p) => x(p.data.k)).attr('width', x.bandwidth()).attr('y', (p) => y(p[1])).attr('height', (p) => Math.max(0, y(p[0]) - y(p[1])))
+    .on('pointermove', (e, p) => { const total = d3.sum(series, (k) => p.data[k]); tipFor(e, meta.catLab(p.data.k), [['c:' + color(series.indexOf(p.key), p.key), meta.seriesLab(p.key), full(p[1] - p[0], meta.currency)], [null, 'Share of bar', ((p[1] - p[0]) / (total || 1) * 100).toFixed(1) + '%'], [null, 'Bar total', full(total, meta.currency)]]); })
+    .on('pointerleave', hideTip).on('click', (e, p) => meta.pick && meta.pick({ cat: p.data.k, series: p.key === 'Other' ? null : p.key }));
+  if (!mini) setLegend(series.map((k, i) => [color(i, k), meta.seriesLab(k)]));
+};
+function timeSeries(rows) {
+  const ts = [...new Set(rows.map((r) => r.t))].sort();
+  const stot = d3.rollup(rows, (v) => d3.sum(v, (r) => Math.abs(r.v || 0)), (r) => r.s);
+  return { ts, dates: ts.map(parseDay), stot };
+}
+R.line = (el, rows, meta, opt) => {
+  const W = opt.W, H = opt.H, mini = opt.mini;
+  const { ts, dates, stot } = timeSeries(rows);
+  const fold = foldTop([...stot.keys()], stot, 8);
+  const keys = fold.keep.concat(fold.other ? ['Other'] : []);
+  const val = new Map(keys.map((k) => [k, new Map()]));
+  for (const r of rows) { const k = fold.keep.includes(r.s) ? r.s : 'Other'; const mm = val.get(k); mm.set(r.t, (mm.get(r.t) || 0) + (r.v || 0)); }
+  if (fold.other && meta.agg === 'avg') { keys.pop(); val.delete('Other'); }
+  const m = mini ? { l: 6, r: 6, t: 8, b: 8 } : { l: 64, r: keys.length <= 4 && keys.length > 1 ? 110 : 18, t: 12, b: 30 };
+  const s = mkSvg(el, W, H, 'Line chart'); const g = s.append('g');
+  const x = d3.scaleTime(d3.extent(dates), [m.l, W - m.r]);
+  const allV = [...val.values()].flatMap((mm) => [...mm.values()]);
+  const y = d3.scaleLinear([meta.agg === 'avg' ? d3.min(allV) * 0.95 : 0, d3.max(allV) || 1], [H - m.b, m.t]).nice();
+  if (!mini) {
+    yGrid(g, y, m.l, W - m.r, meta.currency);
+    const xa = g.append('g').attr('class', 'ax').attr('transform', `translate(0,${H - m.b})`).call(d3.axisBottom(x).ticks(Math.max(2, Math.floor((W - m.l - m.r) / 90))).tickSize(0).tickPadding(10));
+    xa.select('.domain').attr('class', 'base');
+  }
+  const color = (i, k) => (k === 'Other' ? OTHER : PAL[i]);
+  const line = d3.line().defined((d) => d[1] !== undefined).x((d) => x(d[0])).y((d) => y(d[1])).curve(d3.curveMonotoneX);
+  if (keys.length === 1) {
+    const mm = val.get(keys[0]);
+    g.append('path').attr('class', 'area1').style('fill', PAL[0]).attr('d', d3.area().x((t, i) => x(dates[i])).y0(y(y.domain()[0])).y1((t) => y(mm.get(t) || 0)).curve(d3.curveMonotoneX)(ts));
+  }
+  keys.forEach((k, i) => {
+    const mm = val.get(k);
+    g.append('path').attr('class', 'ln2').style('stroke', color(i, k)).attr('d', line(ts.map((t, j) => [dates[j], mm.get(t)])));
+  });
+  if (mini) return;
+  if (keys.length > 1 && keys.length <= 4) {
+    const ends = keys.map((k, i) => ({ k, i, y: y(val.get(k).get(ts[ts.length - 1]) || 0) })).sort((a, b) => a.y - b.y);
+    for (let j = 1; j < ends.length; j++) if (ends[j].y - ends[j - 1].y < 14) ends[j].y = ends[j - 1].y + 14;
+    g.append('g').attr('class', 'dlab').selectAll('text').data(ends).join('text').attr('x', W - m.r + 8).attr('y', (d) => d.y).attr('dominant-baseline', 'middle').text((d) => meta.seriesLab(d.k));
+  }
+  setLegend(keys.length > 1 ? keys.map((k, i) => [color(i, k), meta.seriesLab(k)]) : []);
+  // crosshair
+  const hov = g.append('g').attr('visibility', 'hidden');
+  const xh = hov.append('line').attr('class', 'xh').attr('y1', m.t).attr('y2', H - m.b);
+  const dots = hov.selectAll('circle').data(keys).join('circle').attr('r', 4).attr('class', 'dotc').style('fill', (k, i) => color(i, k));
+  g.append('rect').attr('x', m.l).attr('y', m.t).attr('width', W - m.l - m.r).attr('height', H - m.t - m.b).attr('fill', 'transparent')
+    .on('pointermove', (e) => {
+      const [px] = d3.pointer(e); const dt = x.invert(px); let j = d3.bisectCenter(dates, dt); j = Math.max(0, Math.min(ts.length - 1, j));
+      hov.attr('visibility', 'visible'); xh.attr('x1', x(dates[j])).attr('x2', x(dates[j]));
+      dots.attr('cx', x(dates[j])).attr('cy', (k) => y(val.get(k).get(ts[j]) || 0));
+      const rs = keys.map((k, i) => ['c:' + color(i, k), keys.length > 1 ? meta.seriesLab(k) : meta.mLabel, full(val.get(k).get(ts[j]), meta.currency)]).sort((a, b) => 0);
+      tipFor(e, ymLabel(ts[j].slice(0, 7)), rs);
+    }).on('pointerleave', () => { hov.attr('visibility', 'hidden'); hideTip(); });
+};
+R.stream = (el, rows, meta, opt) => {
+  const W = opt.W, H = opt.H, mini = opt.mini;
+  const { ts, dates, stot } = timeSeries(rows);
+  const fold = foldTop([...stot.keys()], stot, 8);
+  const keys = fold.keep.concat(fold.other ? ['Other'] : []);
+  const table = ts.map((t) => { const o = { t }; keys.forEach((k) => (o[k] = 0)); return o; });
+  const ix = new Map(table.map((o) => [o.t, o]));
+  for (const r of rows) { const k = fold.keep.includes(r.s) ? r.s : 'Other'; ix.get(r.t)[k] += r.v || 0; }
+  const stack = d3.stack().keys(keys).offset(d3.stackOffsetWiggle).order(d3.stackOrderInsideOut)(table);
+  const m = mini ? { l: 4, r: 4, t: 6, b: 6 } : { l: 18, r: 18, t: 12, b: 30 };
+  const s = mkSvg(el, W, H, 'Streamgraph'); const g = s.append('g');
+  const x = d3.scaleTime(d3.extent(dates), [m.l, W - m.r]);
+  const y = d3.scaleLinear([d3.min(stack, (l) => d3.min(l, (p) => p[0])), d3.max(stack, (l) => d3.max(l, (p) => p[1]))], [H - m.b, m.t]);
+  const color = (k) => (k === 'Other' ? OTHER : PAL[keys.indexOf(k)]);
+  const area = d3.area().x((p, i) => x(dates[i])).y0((p) => y(p[0])).y1((p) => y(p[1])).curve(d3.curveBasis);
+  g.append('g').selectAll('path').data(stack).join('path').attr('class', 'mark layer').style('fill', (l) => color(l.key)).attr('d', area)
+    .on('pointermove', (e, l) => { const [px] = d3.pointer(e); let j = d3.bisectCenter(dates, x.invert(px)); j = Math.max(0, Math.min(ts.length - 1, j)); const v = l[j][1] - l[j][0]; const tot = d3.sum(keys, (k) => table[j][k]); tipFor(e, `${meta.seriesLab(l.key)} · ${ymLabel(ts[j].slice(0, 7))}`, [['c:' + color(l.key), meta.mLabel, full(v, meta.currency)], [null, 'Share of month', (v / (tot || 1) * 100).toFixed(1) + '%']]); })
+    .on('pointerleave', hideTip).on('click', (e, l) => meta.pick && l.key !== 'Other' && meta.pick({ series: l.key }));
+  if (mini) return;
+  const xa = g.append('g').attr('class', 'ax').attr('transform', `translate(0,${H - m.b + 6})`).call(d3.axisBottom(x).ticks(Math.max(2, Math.floor(W / 100))).tickSize(0).tickPadding(6));
+  xa.select('.domain').remove();
+  setLegend(keys.map((k) => [color(k), meta.seriesLab(k)]));
+};
+R.multiples = (el, rows, meta, opt) => {
+  const W = opt.W, mini = opt.mini;
+  const { ts, dates, stot } = timeSeries(rows);
+  const keys = [...stot.keys()].sort((a, b) => stot.get(b) - stot.get(a)).slice(0, mini ? 6 : 12);
+  const val = new Map(keys.map((k) => [k, new Map()]));
+  for (const r of rows) if (val.has(r.s)) val.get(r.s).set(r.t, r.v || 0);
+  const cols = mini ? 3 : Math.max(1, Math.min(4, Math.floor(W / 230))), rowsN = Math.ceil(keys.length / cols);
+  const cw = W / cols, chH = mini ? opt.H / rowsN : 150, H = mini ? opt.H : rowsN * chH;
+  const allV = [...val.values()].flatMap((mm) => [...mm.values()]);
+  const y0 = meta.agg === 'avg' ? d3.min(allV) * 0.95 : 0, y1 = d3.max(allV) || 1;
+  const s = mkSvg(el, W, H, 'Small multiples');
+  keys.forEach((k, i) => {
+    const cx = (i % cols) * cw, cy = Math.floor(i / cols) * chH;
+    const m = mini ? { l: 4, r: 4, t: 6, b: 4 } : { l: 10, r: 10, t: 30, b: 18 };
+    const g = s.append('g').attr('transform', `translate(${cx},${cy})`);
+    const x = d3.scaleTime(d3.extent(dates), [m.l, cw - m.r]), y = d3.scaleLinear([y0, y1], [chH - m.b, m.t]);
+    const mm = val.get(k), pts = ts.map((t, j) => [dates[j], mm.get(t)]);
+    g.append('line').attr('class', 'base').attr('x1', m.l).attr('x2', cw - m.r).attr('y1', chH - m.b).attr('y2', chH - m.b);
+    g.append('path').attr('class', 'area1').style('fill', PAL[0]).attr('d', d3.area().defined((d) => d[1] !== undefined).x((d) => x(d[0])).y0(chH - m.b).y1((d) => y(d[1])).curve(d3.curveMonotoneX)(pts));
+    g.append('path').attr('class', 'ln2').style('stroke', PAL[0]).attr('d', d3.line().defined((d) => d[1] !== undefined).x((d) => x(d[0])).y((d) => y(d[1])).curve(d3.curveMonotoneX)(pts));
+    if (mini) return;
+    const last = pts[pts.length - 1];
+    g.append('text').attr('class', 'ftitle').attr('x', m.l).attr('y', 14).text(meta.seriesLab(k));
+    g.append('text').attr('class', 'fval').attr('x', cw - m.r).attr('y', 14).attr('text-anchor', 'end').text(compact(last[1], meta.currency));
+    g.append('rect').attr('x', m.l).attr('y', m.t).attr('width', cw - m.l - m.r).attr('height', chH - m.t - m.b).attr('fill', 'transparent').style('cursor', 'pointer')
+      .on('pointermove', (e) => { const [px] = d3.pointer(e); let j = d3.bisectCenter(dates, x.invert(px)); j = Math.max(0, Math.min(ts.length - 1, j)); tipFor(e, `${meta.seriesLab(k)} · ${ymLabel(ts[j].slice(0, 7))}`, [['c:' + PAL[0], meta.mLabel, full(mm.get(ts[j]), meta.currency)]]); })
+      .on('pointerleave', hideTip).on('click', () => meta.pick && meta.pick({ series: k }));
+  });
+  if (!mini) setLegend([]);
+};
+R.heatmap = (el, rows, meta, opt) => {
+  const W = opt.W, mini = opt.mini;
+  const at = d3.rollup(rows, (v) => d3.sum(v, (r) => r.v), (r) => r.a), bt = d3.rollup(rows, (v) => d3.sum(v, (r) => r.v), (r) => r.b);
+  const as = orderKeys([...at.keys()], meta.catDim, at).slice(0, 25), bs = orderKeys([...bt.keys()], meta.cat2Dim, bt).slice(0, 20);
+  const m = mini ? { l: 4, r: 4, t: 4, b: 4 } : { l: Math.min(160, 24 + d3.max(as, (a) => meta.catLab(a).length) * 7), r: 8, t: 40, b: 8 };
+  const cellH = mini ? (opt.H - m.t - m.b) / as.length : 32, H = mini ? opt.H : m.t + m.b + as.length * cellH;
+  const s = mkSvg(el, W, H, 'Heatmap'); const g = s.append('g');
+  const x = d3.scaleBand(bs, [m.l, W - m.r]).padding(0.04), y = d3.scaleBand(as, [m.t, H - m.b]).padding(0.06);
+  const cells = rows.filter((r) => as.includes(r.a) && bs.includes(r.b));
+  const ext = d3.extent(cells, (r) => r.v);
+  const t = (v) => (v - ext[0]) / ((ext[1] - ext[0]) || 1);
+  g.selectAll('rect').data(cells).join('rect').attr('class', 'mark cell').attr('rx', 3).attr('x', (r) => x(r.b)).attr('y', (r) => y(r.a)).attr('width', x.bandwidth()).attr('height', y.bandwidth())
+    .style('fill', (r) => rampColor(t(r.v)).bg)
+    .on('pointermove', (e, r) => tipFor(e, `${meta.catLab(r.a)} · ${meta.cat2Lab(r.b)}`, [[null, meta.mLabel, full(r.v, meta.currency)]]))
+    .on('pointerleave', hideTip).on('click', (e, r) => meta.pick && meta.pick({ cat: r.a, cat2: r.b }));
+  if (mini) return;
+  if (x.bandwidth() > 46) g.selectAll('text.cv').data(cells).join('text').attr('class', 'cv').attr('x', (r) => x(r.b) + x.bandwidth() / 2).attr('y', (r) => y(r.a) + y.bandwidth() / 2).attr('text-anchor', 'middle').attr('dominant-baseline', 'middle').style('fill', (r) => rampColor(t(r.v)).fg).text((r) => compact(r.v, meta.currency));
+  g.append('g').attr('class', 'ax lbl').selectAll('text').data(as).join('text').attr('x', m.l - 10).attr('y', (a) => y(a) + y.bandwidth() / 2).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').text((a) => meta.catLab(a));
+  g.append('g').attr('class', 'ax lbl').selectAll('text').data(bs).join('text').attr('x', (b) => x(b) + x.bandwidth() / 2).attr('y', m.t - 12).attr('text-anchor', 'middle').text((b) => { const s2 = meta.cat2Lab(b); const max = Math.max(3, Math.floor(x.bandwidth() / 7)); return s2.length > max ? s2.slice(0, max - 1) + '…' : s2; });
+  rampLegend(ext, meta);
+};
+function rampLegend(ext, meta) {
+  const dark = getComputedStyle(document.documentElement).getPropertyValue('--heat-dark').trim() === '1';
+  const lg = el('span', 'lg ramp-lg'); const bar = el('span', 'heat-ramp');
+  bar.style.background = `linear-gradient(90deg, ${(dark ? RAMP_LIGHT.slice().reverse() : RAMP_LIGHT).join(', ')})`;
+  lg.append(document.createTextNode(compact(ext[0], meta.currency)), bar, document.createTextNode(compact(ext[1], meta.currency)));
+  CH.legend.replaceChildren(lg);
+}
+R.calendar = (el, rows, meta, opt) => {
+  const W = opt.W, mini = opt.mini;
+  const byDay = new Map(rows.map((r) => [r.t, r.v]));
+  let years = [...new Set(rows.map((r) => r.t.slice(0, 4)))].sort();
+  years = years.slice(mini ? -2 : -4);
+  const gutter = mini ? 4 : 44, cs = Math.max(4, Math.min(mini ? 6 : 16, Math.floor((W - gutter - 10) / 53)));
+  const yearH = cs * 7 + (mini ? 8 : 30);
+  const H = mini ? opt.H : years.length * yearH + 10;
+  const ext = d3.extent(rows.filter((r) => years.includes(r.t.slice(0, 4))), (r) => r.v);
+  const t = (v) => (v - ext[0]) / ((ext[1] - ext[0]) || 1);
+  const s = mkSvg(el, W, H, 'Calendar heatmap');
+  years.forEach((yr, yi) => {
+    const g = s.append('g').attr('transform', `translate(${gutter},${yi * yearH + (mini ? 2 : 22)})`);
+    const start = new Date(+yr, 0, 1), days = d3.timeDays(start, new Date(+yr + 1, 0, 1));
+    const wk = (d) => d3.timeMonday.count(d3.timeYear(d), d), dow = (d) => (d.getDay() + 6) % 7;
+    const fmt = d3.timeFormat('%Y-%m-%d');
+    g.selectAll('rect').data(days).join('rect').attr('class', 'mark day').attr('width', cs - 1.5).attr('height', cs - 1.5).attr('rx', 2)
+      .attr('x', (d) => wk(d) * cs).attr('y', (d) => dow(d) * cs)
+      .style('fill', (d) => { const v = byDay.get(fmt(d)); return v === undefined ? 'var(--line-soft)' : rampColor(t(v)).bg; })
+      .on('pointermove', (e, d) => { const v = byDay.get(fmt(d)); tipFor(e, d3.timeFormat('%a %d %b %Y')(d), [[null, meta.mLabel, v === undefined ? 'No rows' : full(v, meta.currency)]]); })
+      .on('pointerleave', hideTip).on('click', (e, d) => meta.pickDay && byDay.has(fmt(d)) && meta.pickDay(fmt(d)));
+    if (mini) return;
+    g.append('text').attr('class', 'ftitle').attr('x', -gutter).attr('y', -8).text(yr);
+    g.selectAll('text.mo').data(d3.timeMonths(start, new Date(+yr + 1, 0, 1))).join('text').attr('class', 'ax-t').attr('x', (d) => wk(d) * cs).attr('y', -8).text(d3.timeFormat('%b'));
+    g.selectAll('text.dw').data(['Mon', 'Wed', 'Fri']).join('text').attr('class', 'ax-t').attr('x', -6).attr('text-anchor', 'end').attr('y', (d, i) => (i * 2) * cs + cs * 0.75).text((d) => d);
+  });
+  if (!mini) rampLegend(ext, meta);
+};
+function hierarchyFrom(rows, meta, maxGroups = 8) {
+  const at = d3.rollup(rows, (v) => d3.sum(v, (r) => r.v), (r) => r.a);
+  const fold = foldTop([...at.keys()], at, maxGroups);
+  const groups = new Map();
+  for (const r of rows) {
+    if (!(r.v > 0)) continue;
+    const a = fold.keep.includes(r.a) ? r.a : 'Other';
+    if (!groups.has(a)) groups.set(a, new Map());
+    const gm = groups.get(a), b = a === 'Other' ? r.a : r.b;
+    gm.set(b, (gm.get(b) || 0) + r.v);
+  }
+  const keys = fold.keep.concat(fold.other ? ['Other'] : []).filter((k) => groups.has(k));
+  const root = { name: 'root', children: keys.map((a) => ({ name: a, children: [...groups.get(a)].map(([b, v]) => ({ name: b, value: v, a })) })) };
+  return { root: d3.hierarchy(root).sum((d) => d.value || 0).sort((x, y) => y.value - x.value), keys };
+}
+R.treemap = (el, rows, meta, opt) => {
+  const W = opt.W, H = opt.H, mini = opt.mini;
+  const { root, keys } = hierarchyFrom(rows, meta);
+  d3.treemap().size([W, H]).paddingOuter(mini ? 1 : 3).paddingTop(mini ? 1 : 22).paddingInner(2).round(true)(root);
+  const color = (a) => (a === 'Other' ? OTHER : PAL[keys.indexOf(a)]);
+  const s = mkSvg(el, W, H, 'Treemap');
+  const grp = s.append('g').selectAll('g').data(root.children || []).join('g');
+  if (!mini) grp.append('text').attr('class', 'tm-group').attr('x', (d) => d.x0 + 4).attr('y', (d) => d.y0 + 15).text((d) => { const w = d.x1 - d.x0; const s2 = `${meta.catLab(d.data.name)} · ${compact(d.value, meta.currency)}`; return w > 60 ? (s2.length * 7 > w ? meta.catLab(d.data.name) : s2) : ''; });
+  const leaf = s.append('g').selectAll('g').data(root.leaves()).join('g').attr('transform', (d) => `translate(${d.x0},${d.y0})`);
+  leaf.append('rect').attr('class', 'mark tile').attr('rx', 3).attr('width', (d) => Math.max(0, d.x1 - d.x0)).attr('height', (d) => Math.max(0, d.y1 - d.y0)).style('fill', (d) => color(d.parent.data.name))
+    .on('pointermove', (e, d) => tipFor(e, `${meta.catLab(d.parent.data.name)} · ${d.parent.data.name === 'Other' ? meta.catLab(d.data.name) : meta.cat2Lab(d.data.name)}`, [['c:' + color(d.parent.data.name), meta.mLabel, full(d.value, meta.currency)], [null, 'Share of group', (d.value / d.parent.value * 100).toFixed(1) + '%'], [null, 'Share of total', (d.value / root.value * 100).toFixed(1) + '%']]))
+    .on('pointerleave', hideTip).on('click', (e, d) => meta.pick && d.parent.data.name !== 'Other' && meta.pick({ cat: d.parent.data.name, cat2: d.data.name }));
+  if (mini) return;
+  leaf.filter((d) => d.x1 - d.x0 > 54 && d.y1 - d.y0 > 32).append('text').attr('class', 'tm-label').attr('x', 6).attr('y', 16).text((d) => { const s2 = d.parent.data.name === 'Other' ? meta.catLab(d.data.name) : meta.cat2Lab(d.data.name); const max = Math.floor((d.x1 - d.x0 - 10) / 7); return s2.length > max ? s2.slice(0, Math.max(1, max - 1)) + '…' : s2; })
+    .append('tspan').attr('x', 6).attr('dy', 15).attr('class', 'tm-val').text((d) => compact(d.value, meta.currency));
+  setLegend(keys.map((k) => [color(k), meta.catLab(k)]));
+};
+R.sunburst = (el, rows, meta, opt) => {
+  const W = opt.W, mini = opt.mini, H = opt.H, R0 = Math.min(W, H) / 2 - (mini ? 4 : 12);
+  const { root, keys } = hierarchyFrom(rows, meta);
+  d3.partition().size([2 * Math.PI, R0])(root);
+  const color = (a) => (a === 'Other' ? OTHER : PAL[keys.indexOf(a)]);
+  const inner = R0 * 0.32;
+  const rScale = (y) => inner + ((y - root.y1) / (R0 - root.y1)) * (R0 - inner);
+  const arc = d3.arc().startAngle((d) => d.x0).endAngle((d) => d.x1).padAngle(0.004).padRadius(R0).innerRadius((d) => rScale(d.y0) + 1).outerRadius((d) => rScale(d.y1) - 1).cornerRadius(3);
+  const s = mkSvg(el, W, H, 'Sunburst'); const g = s.append('g').attr('transform', `translate(${W / 2},${H / 2})`);
+  const nodes = root.descendants().filter((d) => d.depth > 0);
+  g.selectAll('path').data(nodes).join('path').attr('class', (d) => 'mark ring' + d.depth).attr('d', arc).style('fill', (d) => color(d.depth === 1 ? d.data.name : d.parent.data.name))
+    .on('pointermove', (e, d) => { const a = d.depth === 1 ? d.data.name : d.parent.data.name; tipFor(e, d.depth === 1 ? meta.catLab(a) : `${meta.catLab(a)} · ${a === 'Other' ? meta.catLab(d.data.name) : meta.cat2Lab(d.data.name)}`, [['c:' + color(a), meta.mLabel, full(d.value, meta.currency)], [null, 'Share of total', (d.value / root.value * 100).toFixed(1) + '%']]); })
+    .on('pointerleave', hideTip).on('click', (e, d) => { if (!meta.pick) return; const a = d.depth === 1 ? d.data.name : d.parent.data.name; if (a === 'Other') return; meta.pick(d.depth === 1 ? { cat: a } : { cat: a, cat2: d.data.name }); });
+  if (mini) return;
+  g.selectAll('text.arc').data(nodes.filter((d) => d.depth === 1 && d.x1 - d.x0 > 0.28)).join('text').attr('class', 'arc-lab')
+    .attr('transform', (d) => { const a = ((d.x0 + d.x1) / 2) * 180 / Math.PI, r = (rScale(d.y0) + rScale(d.y1)) / 2; return `rotate(${a - 90}) translate(${r},0) rotate(${a < 180 ? 0 : 180})`; })
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle').text((d) => { const s2 = meta.catLab(d.data.name); return s2.length > 14 ? s2.slice(0, 13) + '…' : s2; });
+  g.append('text').attr('class', 'center-v').attr('text-anchor', 'middle').attr('y', -2).text(compact(root.value, meta.currency));
+  g.append('text').attr('class', 'center-l').attr('text-anchor', 'middle').attr('y', 18).text('total');
+  setLegend(keys.map((k) => [color(k), meta.catLab(k)]));
+};
+R.donut = (el, rows, meta, opt) => {
+  const W = opt.W, H = opt.H, mini = opt.mini;
+  const tot = new Map(rows.map((r) => [r.k, r.v]));
+  const fold = foldTop(rows.map((r) => r.k), tot, 8);
+  const data = fold.keep.map((k) => ({ k, v: tot.get(k) })).filter((d) => d.v > 0);
+  if (fold.other) data.push({ k: 'Other', v: d3.sum(rows.filter((r) => !fold.keep.includes(r.k)), (r) => r.v) });
+  const sum = d3.sum(data, (d) => d.v);
+  const color = (d, i) => (d.k === 'Other' ? OTHER : PAL[i]);
+  const legendW = mini ? 0 : Math.min(260, W * 0.42);
+  const R0 = Math.min(W - legendW, H) / 2 - (mini ? 4 : 10);
+  const s = mkSvg(el, W, H, 'Donut chart');
+  const g = s.append('g').attr('transform', `translate(${(W - legendW) / 2},${H / 2})`);
+  const arcs = d3.pie().value((d) => d.v).sort(null)(data);
+  const arc = d3.arc().innerRadius(R0 * 0.62).outerRadius(R0).padAngle(0.012).cornerRadius(3);
+  g.selectAll('path').data(arcs).join('path').attr('class', 'mark slice').attr('d', arc).style('fill', (a, i) => color(a.data, i))
+    .on('pointermove', (e, a) => tipFor(e, meta.catLab(a.data.k), [['c:' + color(a.data, a.index), meta.mLabel, full(a.data.v, meta.currency)], [null, 'Share', (a.data.v / sum * 100).toFixed(1) + '%']]))
+    .on('pointerleave', hideTip).on('click', (e, a) => meta.pick && a.data.k !== 'Other' && meta.pick({ cat: a.data.k }));
+  if (mini) return;
+  g.append('text').attr('class', 'center-v').attr('text-anchor', 'middle').attr('y', -2).text(compact(sum, meta.currency));
+  g.append('text').attr('class', 'center-l').attr('text-anchor', 'middle').attr('y', 18).text('total');
+  const lg = s.append('g').attr('transform', `translate(${W - legendW + 10},${Math.max(16, H / 2 - data.length * 13)})`);
+  const row = lg.selectAll('g').data(data).join('g').attr('transform', (d, i) => `translate(0,${i * 26})`);
+  row.append('rect').attr('width', 10).attr('height', 10).attr('rx', 2).attr('y', -5).style('fill', (d, i) => color(d, i));
+  row.append('text').attr('class', 'dl-name').attr('x', 18).attr('dominant-baseline', 'middle').text((d) => { const s2 = meta.catLab(d.k); return s2.length > 18 ? s2.slice(0, 17) + '…' : s2; });
+  row.append('text').attr('class', 'dl-val').attr('x', legendW - 20).attr('text-anchor', 'end').attr('dominant-baseline', 'middle').text((d) => `${(d.v / sum * 100).toFixed(1)}%`);
+  setLegend([]);
+};
+R.scatter = (el, rows, meta, opt) => {
+  const W = opt.W, H = opt.H, mini = opt.mini;
+  const groups = [...new Set(rows.map((r) => r.g).filter((g) => g !== null && g !== undefined))];
+  const useColor = groups.length > 0 && groups.length <= 3;
+  const color = (r) => (useColor ? PAL[groups.indexOf(r.g)] : PAL[0]);
+  const m = mini ? { l: 8, r: 8, t: 8, b: 8 } : { l: 70, r: 24, t: 16, b: 48 };
+  const s = mkSvg(el, W, H, 'Bubble scatter'); const g = s.append('g');
+  const pad = (e) => { const d = (e[1] - e[0]) * 0.08 || Math.abs(e[0] * 0.1) || 1; return [e[0] - d, e[1] + d]; };
+  const x = d3.scaleLinear(pad(d3.extent(rows, (r) => r.x)), [m.l, W - m.r]).nice();
+  const y = d3.scaleLinear(pad(d3.extent(rows, (r) => r.y)), [H - m.b, m.t]).nice();
+  const r = d3.scaleSqrt([0, d3.max(rows, (d) => d.n) || 1], [mini ? 1.5 : 3, mini ? 9 : Math.max(10, Math.min(34, W / 28))]);
+  if (!mini) {
+    yGrid(g, y, m.l, W - m.r, meta.yCurrency);
+    xGrid(g, x, m.t, H - m.b, meta.xCurrency);
+    g.append('text').attr('class', 'ax-title').attr('x', W - m.r).attr('y', H - 6).attr('text-anchor', 'end').text(`${meta.xLabel} →`);
+    g.append('text').attr('class', 'ax-title').attr('x', m.l).attr('y', m.t - 4).text(`↑ ${meta.yLabel}`);
+  }
+  const data = rows.slice().sort((a, b) => b.n - a.n);
+  g.append('g').selectAll('circle').data(data).join('circle').attr('class', 'mark bubble').attr('cx', (d) => x(d.x)).attr('cy', (d) => y(d.y)).attr('r', (d) => r(d.n)).style('fill', color)
+    .on('pointermove', (e, d) => tipFor(e, meta.catLab(d.k) + (d.g !== null && d.g !== undefined ? ` · ${meta.cat2Lab(d.g)}` : ''), [['c:' + color(d), meta.xLabel, full(d.x, meta.xCurrency)], [null, meta.yLabel, full(d.y, meta.yCurrency)], [null, 'Rows', nf0.format(d.n)]]))
+    .on('pointerleave', hideTip).on('click', (e, d) => meta.pick && meta.pick({ cat: d.k, cat2: d.g }));
+  if (mini) return;
+  if (data.length <= 40) {
+    const top = data.slice(0, Math.min(10, data.length));
+    g.append('g').attr('class', 'dlab').selectAll('text').data(top).join('text').attr('x', (d) => x(d.x) + r(d.n) + 4).attr('y', (d) => y(d.y)).attr('dominant-baseline', 'middle').text((d) => meta.catLab(d.k) + (useColor ? '' : d.g ? ` · ${meta.cat2Lab(d.g)}` : ''));
+  }
+  setLegend(useColor ? groups.map((gk, i) => [PAL[i], meta.cat2Lab(gk)]) : []);
+};
+
+// ---------- sample data for gallery thumbnails ----------
+function seeded(seed) { let s = seed; return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
+function sampleRows(id) {
+  const rnd = seeded(id.length * 7919 + 13);
+  const cats = ['North', 'South', 'East', 'West', 'Central', 'Coast'], ser = ['A', 'B', 'C', 'D'];
+  const months = d3.timeMonths(new Date(2023, 0, 1), new Date(2025, 0, 1)).map(d3.timeFormat('%Y-%m-%d'));
+  switch (id) {
+    case 'bar': return cats.map((k, i) => ({ k, v: 100 - i * 13 + rnd() * 8 }));
+    case 'donut': return cats.slice(0, 5).map((k, i) => ({ k, v: 50 - i * 8 + rnd() * 6 }));
+    case 'stacked': return cats.slice(0, 6).flatMap((k, i) => ser.map((s, j) => ({ k, s, v: (40 - i * 4) * (1 - j * 0.2) + rnd() * 6 })));
+    case 'line': return months.flatMap((t, i) => ser.slice(0, 3).map((s, j) => ({ t, s, v: 40 + i * (1.2 - j * 0.4) + Math.sin(i / 1.9 + j) * 8 + rnd() * 4 })));
+    case 'stream': return months.flatMap((t, i) => ser.map((s, j) => ({ t, s, v: 10 + 8 * Math.sin(i / 3 + j * 1.3) + 8 + j * 3 + rnd() * 3 })));
+    case 'multiples': return months.flatMap((t, i) => cats.map((s, j) => ({ t, s, v: 30 + Math.sin(i / 2.5 + j) * 10 + i * (j % 3 - 0.5) + rnd() * 4 })));
+    case 'heatmap': return cats.flatMap((a, i) => ser.concat(['E', 'F']).map((b, j) => ({ a, b, v: Math.sin(i * 0.9) * Math.cos(j * 0.7) * 40 + 50 + rnd() * 10 })));
+    case 'calendar': return d3.timeDays(new Date(2023, 0, 1), new Date(2025, 0, 1)).map((d) => ({ t: d3.timeFormat('%Y-%m-%d')(d), v: 40 + 30 * Math.sin(d.getMonth() / 2) + (d.getDay() % 6 === 0 ? -25 : 0) + rnd() * 20 }));
+    case 'treemap': case 'sunburst': return cats.slice(0, 5).flatMap((a, i) => ser.map((b, j) => ({ a, b, v: (60 - i * 9) * (1.2 - j * 0.25) + rnd() * 5 })));
+    case 'scatter': return Array.from({ length: 18 }, (_, i) => ({ k: 'p' + i, g: ['A', 'B', 'C'][i % 3], x: rnd() * 100, y: 20 + rnd() * 60 + (i % 3) * 10, n: 5 + rnd() * 40 }));
+  }
+  return [];
+}
+const sampleMeta = { mLabel: 'Value', currency: false, agg: 'sum', catLab: String, cat2Lab: String, seriesLab: String, xLabel: 'X', yLabel: 'Y' };
+
+function renderGallery() {
+  if (!HAS_D3) { CH.cards.replaceChildren(el('p', 'err', 'D3 could not be loaded, so charts are unavailable here.')); return; }
+  CH.cards.replaceChildren(...CHARTS.map((c) => {
+    const why = chartAvailable(c);
+    const b = el('button', 'ch-card'); b.type = 'button'; b.disabled = !!why;
+    const pv = el('div', 'ch-preview');
+    b.append(pv, el('span', 'ch-name', c.name), el('span', 'ch-best', why || c.best));
+    b.addEventListener('click', () => openChart(c.id));
+    requestAnimationFrame(() => { try { R[c.id](pv, sampleRows(c.id), sampleMeta, { W: 240, H: 132, mini: true }); } catch (e) { console.warn(e); } });
+    return b;
+  }));
+}
+
+// ---------- builder ----------
+function openChart(id, fields) {
+  const c = chartDef(id); if (!c) return;
+  chState.type = id; chState.fields = Object.assign(defaultFields(c), fields || {});
+  CH.gallery.hidden = true; CH.builder.hidden = false;
+  CH.title.textContent = c.name; CH.best.textContent = c.best;
+  buildFieldControls(c);
+  runChart();
+}
+function buildFieldControls(c) {
+  const opt = (v, l) => { const o = document.createElement('option'); o.value = v; o.textContent = l; return o; };
+  CH.fields.replaceChildren(...c.fields.map(([k, label, type]) => {
+    const wrap = el('label', 'ch-field'); wrap.append(document.createTextNode(label));
+    const sel = el('select'); sel.id = 'chf-' + k;
+    if (type === 'cat' || type === 'cat?') sel.append(...(type === 'cat?' ? [opt('', '— none —')] : []), ...chDims().map((d) => opt(d.key, d.label)));
+    else sel.append(...chMeasures(type === 'measureSum').map((m) => opt(m.key, m.label)));
+    sel.value = chState.fields[k] ?? '';
+    if (sel.value !== (chState.fields[k] ?? '')) { sel.selectedIndex = 0; chState.fields[k] = sel.value; }
+    sel.addEventListener('change', () => { chState.fields[k] = sel.value; runChart(); });
+    wrap.append(sel); return wrap;
+  }));
+}
+function chartSpec() {
+  return { chart: chState.type, fields: { ...chState.fields }, filter: main.where || null, table: main.base };
+}
+async function runChart() {
+  const c = chartDef(chState.type); if (!c || !HAS_D3) return;
+  const f = chState.fields;
+  if (['heatmap', 'treemap', 'sunburst'].includes(c.id) && f.cat === f.cat2) { CH.note.textContent = 'Pick two different fields.'; CH.area.replaceChildren(); return; }
+  const gen = ++chState.gen;
+  const sql = chartSql(c, f);
+  CH.spec.textContent = JSON.stringify(chartSpec(), null, 2) + '\n\n-- SQL sent to DuckDB\n' + sql;
+  const done = busy(`Building ${c.name.toLowerCase()}`);
+  try {
+    const { res, ms } = await run(sql, `Chart: ${c.name}`);
+    if (gen !== chState.gen) { done(); return; }
+    chState.rows = toRows(res);
+    CH.note.textContent = `${nf0.format(chState.rows.length)} result rows · ${fmtMs(ms)} over ${nf0.format(main.rowCount)} rows${main.where ? ' (filtered)' : ''}. Hover for details; click a mark to filter.`;
+    drawChart();
+    done(`${c.name} ready`);
+  } catch (e) { done('Chart failed'); CH.area.replaceChildren(el('p', 'err', cleanErr(e))); }
+}
+function chartMeta() {
+  const f = chState.fields, m = measOf(f.measure || f.y) || {}, cd = dimOf(f.cat), c2 = dimOf(f.cat2), sd = dimOf(f.series);
+  const condFor = (d, v) => (v === null || v === undefined ? `${d.expr} IS NULL` : `${d.expr} = ${qs(v)}`);
+  return {
+    mLabel: m.label ? cap(m.noun) : 'Value', currency: !!m.currency, agg: m.agg,
+    catDim: cd, cat2Dim: c2, seriesDim: sd,
+    catLab: (v) => lab(cd, v), cat2Lab: (v) => lab(c2, v), seriesLab: (v) => (v === 'Other' ? 'Other' : lab(sd, v)),
+    xLabel: cap(measOf(f.x)?.noun || ''), yLabel: cap(measOf(f.y)?.noun || ''), xCurrency: !!measOf(f.x)?.currency, yCurrency: !!measOf(f.y)?.currency,
+    pick: (p) => { const conds = []; if (p.cat !== undefined && cd) conds.push(condFor(cd, p.cat)); if (p.cat2 !== undefined && p.cat2 !== null && c2) conds.push(condFor(c2, p.cat2)); if (p.series !== undefined && p.series !== null && sd) conds.push(condFor(sd, p.series)); if (conds.length) addFilter(conds.join(' AND ')); },
+    pickDay: (day) => state.dateCol && addFilter(`${qi(state.dateCol)} = DATE '${day}'`),
+  };
+}
+function drawChart() {
+  if (!chState.rows) return;
+  const c = chartDef(chState.type);
+  CH.area.replaceChildren(); hideTip();
+  if (!chState.rows.length) { CH.area.append(el('p', 'ins-empty', 'No rows match the current filter.')); CH.legend.replaceChildren(); return; }
+  const W = Math.max(300, CH.area.clientWidth), H = Math.max(320, Math.min(520, Math.round(W * 0.52)));
+  R[c.id](CH.area, chState.rows, chartMeta(), { W, H: c.id === 'sunburst' || c.id === 'donut' ? Math.min(H, 460) : H, mini: false });
+}
+CH.back.addEventListener('click', () => { CH.builder.hidden = true; CH.gallery.hidden = false; hideTip(); renderGallery(); });
+let chW = 0;
+new ResizeObserver(() => { const w = CH.area.clientWidth; if (w && Math.abs(w - chW) > 4 && currentView === 'charts' && !CH.builder.hidden) { chW = w; drawChart(); } }).observe(CH.root);
+
+// ---------- boot ----------
+async function boot() {
+  try {
+    if (typeof WebAssembly === 'undefined') throw new Error('WebAssembly is not available in this browser.');
+    setBoot('Downloading DuckDB engine', 0);
+    const res = await fetch('duckdb-eh.gz.wasm');
+    if (!res.ok) throw new Error(`Engine download failed (HTTP ${res.status}).`);
+    const total = +res.headers.get('content-length') || ENGINE_GZ_BYTES;
+    let bytes;
+    if (res.body && res.body.getReader) {
+      const reader = res.body.getReader(), parts = []; let got = 0;
+      for (;;) {
+        const { done, value } = await reader.read(); if (done) break;
+        parts.push(value); got += value.length;
+        setBoot(`Downloading DuckDB engine · ${(got / 1048576).toFixed(1)} of ${(Math.max(total, got) / 1048576).toFixed(1)} MB`, Math.min(1, got / total));
+      }
+      bytes = new Uint8Array(got); let o = 0; for (const p of parts) { bytes.set(p, o); o += p.length; }
+    } else bytes = new Uint8Array(await res.arrayBuffer());
+    if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+      setBoot('Unpacking engine');
+      if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack the engine (DecompressionStream missing).');
+      bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    }
+    const wasmUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/wasm' }));
+    setBoot('Starting database');
+    const wres = await fetch('duckdb-browser-eh.worker.js');
+    if (!wres.ok) throw new Error(`Worker download failed (HTTP ${wres.status}).`);
+    const workerUrl = URL.createObjectURL(new Blob([await wres.text()], { type: 'text/javascript' }));
+    const worker = new Worker(workerUrl);
+    db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
+    await db.instantiate(wasmUrl);
+    conn = await db.connect();
+    for (const s of ['SET autoinstall_known_extensions = false', 'SET autoload_known_extensions = false']) { try { await conn.query(s); } catch (e) {} }
+    try { const v = await scalar('SELECT version()'); $('#engineTag').textContent = `DuckDB ${v} · WebAssembly · canvas grid`; } catch (e) {}
+    const n = +ui.rowsSel.value;
+    setBoot(`Generating ${nf0.format(n)} sample sales rows`);
+    ui.bootTitle.textContent = 'Engine ready';
+    const done = busy(`Generating ${nf0.format(n)} rows`);
+    await loadBase('sales', `Generate ${nf0.format(n)} sales rows`, generateSql(n), { row1: 'region', col: 'channel', measure: 'revenue', agg: 'sum' });
+    ui.boot.hidden = true;
+    done(`Generated ${nf0.format(n)} rows`);
+    await refreshInsights();
+    await runPivot();
+  } catch (e) { console.error(e); showError(e); }
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => grids.forEach((g) => { g.layout(); g.invalidate(); }));
+boot();
+})();
+</script>

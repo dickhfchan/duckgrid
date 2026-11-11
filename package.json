@@ -1,0 +1,17 @@
+{
+  "name": "duckgrid",
+  "private": true,
+  "description": "DuckDB-WASM grid, pivot, auto-insights and D3 chart gallery as one self-contained page",
+  "scripts": {
+    "build": "bash build.sh",
+    "serve": "cd dist && python3 -m http.server 8765"
+  },
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "1.29.0",
+    "apache-arrow": "17.0.0",
+    "d3": "7.9.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.23.1"
+  }
+}
